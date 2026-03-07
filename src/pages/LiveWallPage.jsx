@@ -15,102 +15,55 @@ import {
   Star,
   Clock
 } from 'lucide-react';
+import { questionService } from '../services/supabase';
+import { QUESTIONS } from '../constants/realData';
 
 const LiveWallPage = () => {
   const { activityId } = useParams();
   
-  const [questions, setQuestions] = useState([
-    {
-      id: 1,
-      asker: '张三',
-      question: '请问这个产品的定价策略是什么？',
-      time: '2024-03-05 10:30:00',
-      isFeatured: true
-    },
-    {
-      id: 2,
-      asker: '李四',
-      question: '关于售后服务的问题，希望能得到详细的解答',
-      time: '2024-03-05 11:15:00',
-      isFeatured: false
-    },
-    {
-      id: 3,
-      asker: '王五',
-      question: '是否支持定制化开发？我们的需求比较特殊',
-      time: '2024-03-05 14:20:00',
-      isFeatured: true
-    },
-    {
-      id: 4,
-      asker: '赵六',
-      question: '技术支持的时间是多久？',
-      time: '2024-03-05 15:45:00',
-      isFeatured: false
-    },
-    {
-      id: 5,
-      asker: '孙七',
-      question: '关于合作模式的疑问，希望能了解更多细节',
-      time: '2024-03-05 16:30:00',
-      isFeatured: false
-    },
-    {
-      id: 6,
-      asker: '周八',
-      question: '产品的技术架构是怎样的？',
-      time: '2024-03-05 17:00:00',
-      isFeatured: true
-    },
-    {
-      id: 7,
-      asker: '吴九',
-      question: '如何申请成为高级代理商？',
-      time: '2024-03-05 17:30:00',
-      isFeatured: false
-    }
-  ]);
-
+  const [questions, setQuestions] = useState([]);
   const [newQuestions, setNewQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const sampleQuestions = [
-        '请问这个产品的定价策略是什么？',
-        '关于售后服务的问题',
-        '是否支持定制化开发？',
-        '技术支持的时间是多久？',
-        '关于合作模式的疑问',
-        '产品的技术架构是怎样的？',
-        '如何申请成为高级代理商？',
-        '返利政策是怎样的？',
-        '是否有培训支持？',
-        '产品的核心竞争力是什么？'
-      ];
-      
-      const sampleNames = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十', '钱十一', '陈十二'];
-      
-      if (Math.random() > 0.7) {
-        const randomQuestion = sampleQuestions[Math.floor(Math.random() * sampleQuestions.length)];
-        const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
-        
-        const newQuestion = {
-          id: Date.now(),
-          asker: randomName,
-          question: randomQuestion,
-          time: new Date().toLocaleString('zh-CN', { hour12: false }),
-          isFeatured: Math.random() > 0.8
-        };
-        
-        setNewQuestions(prev => [newQuestion, ...prev].slice(0, 5));
-        setQuestions(prev => [newQuestion, ...prev].slice(0, 20));
-      }
-    }, 5000);
+    loadQuestions();
+  }, []);
 
+  const loadQuestions = async () => {
+    setLoading(true);
+    try {
+      const data = await questionService.getAll();
+      // 只显示已上墙的问题
+      const approvedQuestions = (data?.length ? data : QUESTIONS)
+        .filter(q => q.status === 'approved')
+        .map(q => ({
+          ...q,
+          isFeatured: q.is_featured || q.isFeatured
+        }));
+      setQuestions(approvedQuestions);
+    } catch (e) {
+      const approvedQuestions = QUESTIONS
+        .filter(q => q.status === 'approved')
+        .map(q => ({
+          ...q,
+          isFeatured: q.is_featured || q.isFeatured
+        }));
+      setQuestions(approvedQuestions);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 定时刷新数据
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadQuestions();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const handleRefresh = () => {
+    loadQuestions();
     message.success('已刷新提问墙');
     setNewQuestions([]);
   };

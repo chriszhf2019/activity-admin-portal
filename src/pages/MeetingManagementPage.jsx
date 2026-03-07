@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   Table, 
@@ -16,7 +16,8 @@ import {
   Divider,
   Tabs,
   Form,
-  Input
+  Input,
+  Empty
 } from 'antd';
 import { 
   RefreshCw,
@@ -35,6 +36,8 @@ import {
   Bell
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { activityService, questionService, userService } from '../services/supabase';
+import { ACTIVITIES, QUESTIONS, USERS } from '../constants/realData';
 
 const { TextArea } = Input;
 
@@ -44,9 +47,23 @@ const MeetingManagementPage = () => {
   
   const [activeTab, setActiveTab] = useState('registration');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [isNotificationModalVisible, setIsNotificationModalVisible] = useState(false);
   const [notificationForm] = Form.useForm();
+  
+  // 数据状态
+  const [meetingData, setMeetingData] = useState({
+    name: '渠道商大会',
+    time: '2024-03-05 09:00 - 18:00',
+    location: '北京市朝阳区建国路88号',
+    totalRegistrations: 0,
+    checkedInCount: 0,
+    pendingQuestions: 0
+  });
+  const [registrationData, setRegistrationData] = useState([]);
+  const [questionData, setQuestionData] = useState([]);
+  
   const [materials, setMaterials] = useState([
     {
       id: 1,
@@ -73,123 +90,90 @@ const MeetingManagementPage = () => {
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [uploadForm] = Form.useForm();
 
-  const meetingData = {
-    name: '渠道商大会',
-    time: '2024-03-05 09:00 - 18:00',
-    location: '北京市朝阳区建国路88号',
-    totalRegistrations: 156,
-    checkedInCount: 128,
-    pendingQuestions: 5
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [activities, users, questions] = await Promise.all([
+        activityService.getAll(),
+        userService.getAll(),
+        questionService.getAll()
+      ]);
+      
+      const activityData = activities?.length ? activities : ACTIVITIES;
+      const userData = users?.length ? users : USERS;
+      const questionList = questions?.length ? questions : QUESTIONS;
+      
+      // 获取当前活动信息
+      const currentActivity = id ? activityData.find(a => a.id === parseInt(id)) : activityData[0];
+      
+      if (currentActivity) {
+        setMeetingData({
+          name: currentActivity.name,
+          time: currentActivity.create_time || currentActivity.createTime || '2024-03-05 09:00 - 18:00',
+          location: currentActivity.location || '北京市朝阳区建国路88号',
+          totalRegistrations: currentActivity.registered || userData.length,
+          checkedInCount: currentActivity.checked_in || currentActivity.checkedIn || Math.floor(userData.length * 0.8),
+          pendingQuestions: questionList.filter(q => q.status === 'pending').length
+        });
+      }
+      
+      // 设置报名数据（使用用户数据模拟）
+      const regData = userData.map(u => ({
+        id: u.id,
+        name: u.real_name || u.realName,
+        company: u.company,
+        phone: u.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '138****0000',
+        avatar: (u.real_name || u.realName)?.[0] || '?',
+        registrationTime: u.register_time || u.registerTime || '2024-03-01 10:30:00',
+        checkInStatus: Math.random() > 0.3 ? 'checked' : 'pending',
+        checkInTime: Math.random() > 0.3 ? '2024-03-05 09:15:00' : null
+      }));
+      setRegistrationData(regData);
+      
+      // 设置提问数据
+      const qData = questionList.map(q => ({
+        id: q.id,
+        userName: q.asker,
+        question: q.question,
+        time: q.time,
+        status: q.status
+      }));
+      setQuestionData(qData);
+      
+    } catch (e) {
+      // 使用本地数据
+      setRegistrationData(USERS.map(u => ({
+        id: u.id,
+        name: u.realName,
+        company: u.company,
+        phone: u.phone?.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') || '138****0000',
+        avatar: u.realName?.[0] || '?',
+        registrationTime: u.registerTime || '2024-03-01 10:30:00',
+        checkInStatus: Math.random() > 0.3 ? 'checked' : 'pending',
+        checkInTime: Math.random() > 0.3 ? '2024-03-05 09:15:00' : null
+      })));
+      setQuestionData(QUESTIONS.map(q => ({
+        id: q.id,
+        userName: q.asker,
+        question: q.question,
+        time: q.time,
+        status: q.status
+      })));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const registrationData = [
-    {
-      id: 1,
-      name: '张三',
-      company: '科技有限公司',
-      phone: '138****1234',
-      avatar: '张',
-      registrationTime: '2024-03-01 10:30:00',
-      checkInStatus: 'checked',
-      checkInTime: '2024-03-05 09:15:00'
-    },
-    {
-      id: 2,
-      name: '李四',
-      company: '贸易公司',
-      phone: '139****5678',
-      avatar: '李',
-      registrationTime: '2024-03-02 14:20:00',
-      checkInStatus: 'pending',
-      checkInTime: null
-    },
-    {
-      id: 3,
-      name: '王五',
-      company: '实业集团',
-      phone: '137****9012',
-      avatar: '王',
-      registrationTime: '2024-03-03 09:00:00',
-      checkInStatus: 'checked',
-      checkInTime: '2024-03-05 09:20:00'
-    },
-    {
-      id: 4,
-      name: '赵六',
-      company: '网络科技',
-      phone: '136****3456',
-      avatar: '赵',
-      registrationTime: '2024-03-04 11:30:00',
-      checkInStatus: 'pending',
-      checkInTime: null
-    },
-    {
-      id: 5,
-      name: '孙七',
-      company: '未完善',
-      phone: '158****7890',
-      avatar: '孙',
-      registrationTime: '2024-03-04 15:00:00',
-      checkInStatus: 'pending',
-      checkInTime: null
-    },
-    {
-      id: 6,
-      name: '周八',
-      company: '数据服务',
-      phone: '135****2468',
-      avatar: '周',
-      registrationTime: '2024-03-05 08:45:00',
-      checkInStatus: 'checked',
-      checkInTime: '2024-03-05 09:00:00'
-    }
-  ];
-
   const checkInUsers = registrationData.filter(user => user.checkInStatus === 'checked');
-
-  const questionData = [
-    {
-      id: 1,
-      userName: '张三',
-      question: '请问这个产品的定价策略是什么？',
-      time: '2024-03-05 10:30:00',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      userName: '李四',
-      question: '关于售后服务的响应时间有多长？',
-      time: '2024-03-05 10:45:00',
-      status: 'approved'
-    },
-    {
-      id: 3,
-      userName: '王五',
-      question: '是否支持定制化开发？',
-      time: '2024-03-05 11:00:00',
-      status: 'pending'
-    },
-    {
-      id: 4,
-      userName: '赵六',
-      question: '技术支持团队有多少人？',
-      time: '2024-03-05 11:30:00',
-      status: 'pending'
-    },
-    {
-      id: 5,
-      userName: '孙七',
-      question: '合作模式有哪些？',
-      time: '2024-03-05 14:00:00',
-      status: 'approved'
-    }
-  ];
-
-  const checkInRate = Math.round((checkInUsers.length / registrationData.length) * 100);
+  const checkInRate = registrationData.length > 0 ? Math.round((checkInUsers.length / registrationData.length) * 100) : 0;
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    loadData().finally(() => setRefreshing(false));
     message.success('数据已刷新');
   };
 
@@ -200,6 +184,9 @@ const MeetingManagementPage = () => {
       okText: '确定',
       cancelText: '取消',
       onOk: () => {
+        setRegistrationData(registrationData.map(u => 
+          u.id === userId ? { ...u, checkInStatus: 'checked', checkInTime: new Date().toLocaleString('zh-CN', { hour12: false }) } : u
+        ));
         message.success('签到成功');
       },
     });
@@ -209,10 +196,13 @@ const MeetingManagementPage = () => {
     message.success('正在导出报名名单到 Excel...');
   };
 
-  const handleApproveQuestion = (id) => {
-    const newData = questionData.map(q => 
+  const handleApproveQuestion = async (id) => {
+    try {
+      await questionService.updateStatus(id, 'approved');
+    } catch (e) {}
+    setQuestionData(questionData.map(q => 
       q.id === id ? { ...q, status: 'approved' } : q
-    );
+    ));
     message.success('已准许上墙');
   };
 
@@ -222,7 +212,13 @@ const MeetingManagementPage = () => {
       content: '确定要隐藏这个问题吗？',
       okText: '确定',
       cancelText: '取消',
-      onOk: () => {
+      onOk: async () => {
+        try {
+          await questionService.updateStatus(id, 'hidden');
+        } catch (e) {}
+        setQuestionData(questionData.map(q => 
+          q.id === id ? { ...q, status: 'hidden' } : q
+        ));
         message.success('已隐藏');
       },
     });
