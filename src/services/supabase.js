@@ -1,16 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 
 // 从环境变量读取配置
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// 检查配置是否有效
+const isConfigured = supabaseUrl && supabaseKey;
 
 // 创建 Supabase 客户端
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = isConfigured ? createClient(supabaseUrl, supabaseKey) : null;
 
 // ==================== 认证服务 ====================
 export const authService = {
-  // 管理员登录
   async login(username, password) {
+    // 如果数据库未配置，使用本地验证
+    if (!supabase) {
+      if (username === 'admin' && password === 'admin123') {
+        return { username: 'admin', name: '超级管理员', role: 'admin' };
+      }
+      throw new Error('用户名或密码错误');
+    }
+    
     const { data, error } = await supabase
       .from('admins')
       .select('*')
@@ -24,9 +34,11 @@ export const authService = {
     return data;
   },
 
-  // 修改密码
   async changePassword(username, oldPassword, newPassword) {
-    // 先验证旧密码
+    if (!supabase) {
+      throw new Error('数据库未配置，无法修改密码');
+    }
+    
     const { data: admin } = await supabase
       .from('admins')
       .select('*')
@@ -38,7 +50,6 @@ export const authService = {
       throw new Error('原密码错误');
     }
 
-    // 更新密码
     const { error } = await supabase
       .from('admins')
       .update({ password: newPassword })
@@ -52,6 +63,7 @@ export const authService = {
 // ==================== 用户服务 ====================
 export const userService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -61,6 +73,7 @@ export const userService = {
   },
 
   async getById(id) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -71,6 +84,7 @@ export const userService = {
   },
 
   async updatePoints(id, points) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('users')
       .update({ points })
@@ -82,6 +96,7 @@ export const userService = {
   },
 
   async updateStatus(id, status) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('users')
       .update({ status })
@@ -96,6 +111,7 @@ export const userService = {
 // ==================== 活动服务 ====================
 export const activityService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('activities')
       .select('*')
@@ -105,6 +121,7 @@ export const activityService = {
   },
 
   async create(activity) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('activities')
       .insert(activity)
@@ -115,6 +132,7 @@ export const activityService = {
   },
 
   async update(id, activity) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('activities')
       .update(activity)
@@ -126,6 +144,7 @@ export const activityService = {
   },
 
   async delete(id) {
+    if (!supabase) return false;
     const { error } = await supabase
       .from('activities')
       .delete()
@@ -138,6 +157,7 @@ export const activityService = {
 // ==================== 提问服务 ====================
 export const questionService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('questions')
       .select('*')
@@ -147,6 +167,7 @@ export const questionService = {
   },
 
   async updateStatus(id, status) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('questions')
       .update({ status })
@@ -158,6 +179,7 @@ export const questionService = {
   },
 
   async setFeatured(id, isFeatured) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('questions')
       .update({ is_featured: isFeatured })
@@ -169,6 +191,7 @@ export const questionService = {
   },
 
   async setAnswered(id, isAnswered) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('questions')
       .update({ is_answered: isAnswered })
@@ -183,6 +206,7 @@ export const questionService = {
 // ==================== 礼品服务 ====================
 export const giftService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('gifts')
       .select('*')
@@ -192,6 +216,7 @@ export const giftService = {
   },
 
   async create(gift) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('gifts')
       .insert(gift)
@@ -202,6 +227,7 @@ export const giftService = {
   },
 
   async update(id, gift) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('gifts')
       .update(gift)
@@ -213,6 +239,7 @@ export const giftService = {
   },
 
   async delete(id) {
+    if (!supabase) return false;
     const { error } = await supabase
       .from('gifts')
       .delete()
@@ -225,6 +252,7 @@ export const giftService = {
 // ==================== 兑换记录服务 ====================
 export const redeemService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('redeem_records')
       .select('*')
@@ -234,6 +262,7 @@ export const redeemService = {
   },
 
   async updateStatus(id, status, rejectReason = null) {
+    if (!supabase) return null;
     const updateData = { status };
     if (rejectReason) updateData.reject_reason = rejectReason;
     
@@ -251,6 +280,7 @@ export const redeemService = {
 // ==================== 积分规则服务 ====================
 export const pointRuleService = {
   async getAll() {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('point_rules')
       .select('*')
@@ -260,6 +290,7 @@ export const pointRuleService = {
   },
 
   async create(rule) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('point_rules')
       .insert(rule)
@@ -270,6 +301,7 @@ export const pointRuleService = {
   },
 
   async update(id, rule) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('point_rules')
       .update(rule)
@@ -281,6 +313,7 @@ export const pointRuleService = {
   },
 
   async delete(id) {
+    if (!supabase) return false;
     const { error } = await supabase
       .from('point_rules')
       .delete()
@@ -290,6 +323,7 @@ export const pointRuleService = {
   },
 
   async toggleStatus(id, status) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('point_rules')
       .update({ status })
@@ -304,6 +338,7 @@ export const pointRuleService = {
 // ==================== 积分记录服务 ====================
 export const pointsRecordService = {
   async getByUserId(userId) {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('points_records')
       .select('*')
@@ -314,6 +349,7 @@ export const pointsRecordService = {
   },
 
   async create(record) {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('points_records')
       .insert(record)
@@ -327,6 +363,7 @@ export const pointsRecordService = {
 // ==================== 用户反馈服务 ====================
 export const feedbackService = {
   async getByUserId(userId) {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('user_feedbacks')
       .select('*')
