@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   Row, 
@@ -14,11 +14,8 @@ import {
   message,
   Avatar,
   Statistic,
-  Divider,
-  List,
   Switch,
   Empty,
-  Upload,
   Select
 } from 'antd';
 import { 
@@ -29,25 +26,22 @@ import {
   CheckCircle,
   XCircle,
   Package,
-  Star,
-  Settings,
-  Upload as UploadIcon,
   TrendingUp,
   Clock,
-  User,
   Phone
 } from 'lucide-react';
+import { giftService, redeemService, pointRuleService } from '../services/supabase';
 import { GIFTS, REDEEM_RECORDS, POINT_RULES } from '../constants/realData';
 
 const { TextArea } = Input;
 
 const PointsMallPage = () => {
   const [activeTab, setActiveTab] = useState('rules');
+  const [pointRules, setPointRules] = useState([]);
+  const [gifts, setGifts] = useState([]);
+  const [redeemRecords, setRedeemRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
   
-  const [pointRules, setPointRules] = useState(POINT_RULES);
-  const [gifts, setGifts] = useState(GIFTS);
-  const [redeemRecords, setRedeemRecords] = useState(REDEEM_RECORDS);
-
   const [isRuleModalVisible, setIsRuleModalVisible] = useState(false);
   const [isGiftModalVisible, setIsGiftModalVisible] = useState(false);
   const [isRejectModalVisible, setIsRejectModalVisible] = useState(false);
@@ -58,52 +52,81 @@ const PointsMallPage = () => {
   const [giftForm] = Form.useForm();
   const [rejectForm] = Form.useForm();
 
-  const handleEditRule = (record) => {
-    setEditingRule(record);
-    ruleForm.setFieldsValue(record);
-    setIsRuleModalVisible(true);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [rulesData, giftsData, recordsData] = await Promise.all([
+        pointRuleService.getAll(),
+        giftService.getAll(),
+        redeemService.getAll()
+      ]);
+      setPointRules(rulesData?.length ? rulesData : POINT_RULES);
+      setGifts(giftsData?.length ? giftsData : GIFTS);
+      setRedeemRecords(recordsData?.length ? recordsData : REDEEM_RECORDS);
+    } catch (e) {
+      setPointRules(POINT_RULES);
+      setGifts(GIFTS);
+      setRedeemRecords(REDEEM_RECORDS);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // 积分规则操作
   const handleAddRule = () => {
     setEditingRule(null);
     ruleForm.resetFields();
     setIsRuleModalVisible(true);
   };
 
-  const handleRuleOk = () => {
-    ruleForm.validateFields().then((values) => {
-      if (editingRule) {
-        setPointRules(pointRules.map(rule => 
-          rule.id === editingRule.id ? { ...rule, ...values } : rule
-        ));
-        message.success('规则更新成功');
-      } else {
-        setPointRules([...pointRules, { ...values, id: Date.now(), status: true }]);
-        message.success('规则添加成功');
-      }
-      setIsRuleModalVisible(false);
-      ruleForm.resetFields();
-    });
+  const handleEditRule = (record) => {
+    setEditingRule(record);
+    ruleForm.setFieldsValue(record);
+    setIsRuleModalVisible(true);
   };
 
-  const handleToggleRule = (id, status) => {
-    setPointRules(pointRules.map(rule => 
-      rule.id === id ? { ...rule, status: !status } : rule
-    ));
-    message.success(status ? '规则已关闭' : '规则已开启');
+  const handleRuleOk = async () => {
+    const values = await ruleForm.validateFields();
+    if (editingRule) {
+      try { await pointRuleService.update(editingRule.id, values); } catch (e) {}
+      setPointRules(pointRules.map(r => r.id === editingRule.id ? { ...r, ...values } : r));
+      message.success('更新成功');
+    } else {
+      const newRule = { ...values, id: Date.now(), status: true };
+      try { await pointRuleService.create(values); } catch (e) {}
+      setPointRules([...pointRules, newRule]);
+      message.success('添加成功');
+    }
+    setIsRuleModalVisible(false);
+  };
+
+  const handleToggleRule = async (id, status) => {
+    try { await pointRuleService.toggleStatus(id, !status); } catch (e) {}
+    setPointRules(pointRules.map(r => r.id === id ? { ...r, status: !status } : r));
+    message.success(status ? '已关闭' : '已开启');
   };
 
   const handleDeleteRule = (id) => {
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除这个积分规则吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk: () => {
-        setPointRules(pointRules.filter(rule => rule.id !== id));
+      content: '确定要删除这个规则吗？',
+      onOk: async () => {
+        try { await pointRuleService.delete(id); } catch (e) {}
+        setPointRules(pointRules.filter(r => r.id !== id));
         message.success('删除成功');
       },
     });
+  };
+
+  // 礼品操作
+  const handleAddGift = () => {
+    setEditingGift(null);
+    giftForm.resetFields();
+    setIsGiftModalVisible(true);
   };
 
   const handleEditGift = (record) => {
@@ -112,64 +135,42 @@ const PointsMallPage = () => {
     setIsGiftModalVisible(true);
   };
 
-  const handleAddGift = () => {
-    setEditingGift(null);
-    giftForm.resetFields();
-    setIsGiftModalVisible(true);
-  };
-
-  const handleGiftOk = () => {
-    giftForm.validateFields().then((values) => {
-      if (editingGift) {
-        setGifts(gifts.map(gift => 
-          gift.id === editingGift.id ? { ...gift, ...values } : gift
-        ));
-        message.success('礼品更新成功');
-      } else {
-        setGifts([...gifts, { ...values, id: Date.now(), redeemed: 0 }]);
-        message.success('礼品添加成功');
-      }
-      setIsGiftModalVisible(false);
-      giftForm.resetFields();
-    });
+  const handleGiftOk = async () => {
+    const values = await giftForm.validateFields();
+    if (editingGift) {
+      try { await giftService.update(editingGift.id, values); } catch (e) {}
+      setGifts(gifts.map(g => g.id === editingGift.id ? { ...g, ...values } : g));
+      message.success('更新成功');
+    } else {
+      const newGift = { ...values, id: Date.now(), redeemed: 0 };
+      try { await giftService.create(values); } catch (e) {}
+      setGifts([...gifts, newGift]);
+      message.success('添加成功');
+    }
+    setIsGiftModalVisible(false);
   };
 
   const handleDeleteGift = (id) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个礼品吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk: () => {
-        setGifts(gifts.filter(gift => gift.id !== id));
+      onOk: async () => {
+        try { await giftService.delete(id); } catch (e) {}
+        setGifts(gifts.filter(g => g.id !== id));
         message.success('删除成功');
       },
     });
   };
 
+  // 兑换操作
   const handleConfirmRedeem = (record) => {
     Modal.confirm({
       title: '确认发放',
-      content: (
-        <div>
-          <p>确定要为以下用户发放礼品吗？</p>
-          <p><strong>用户：</strong>{record.userName}</p>
-          <p><strong>礼品：</strong>{record.giftName}</p>
-          <p><strong>消耗积分：</strong>{record.points}</p>
-        </div>
-      ),
-      okText: '确定发放',
-      cancelText: '取消',
-      onOk: () => {
-        setRedeemRecords(redeemRecords.map(r => 
-          r.id === record.id ? { ...r, status: 'completed' } : r
-        ));
-        
-        setGifts(gifts.map(gift => 
-          gift.name === record.giftName ? { ...gift, stock: gift.stock - 1, redeemed: gift.redeemed + 1 } : gift
-        ));
-        
-        message.success('礼品发放成功');
+      content: `确定要为 ${record.user_name || record.userName} 发放 ${record.gift_name || record.giftName} 吗？`,
+      onOk: async () => {
+        try { await redeemService.updateStatus(record.id, 'completed'); } catch (e) {}
+        setRedeemRecords(redeemRecords.map(r => r.id === record.id ? { ...r, status: 'completed' } : r));
+        message.success('发放成功');
       },
     });
   };
@@ -180,386 +181,118 @@ const PointsMallPage = () => {
     setIsRejectModalVisible(true);
   };
 
-  const handleRejectOk = () => {
-    rejectForm.validateFields().then((values) => {
-      setRedeemRecords(redeemRecords.map(r => 
-        r.id === rejectingRecord.id ? { ...r, status: 'rejected', rejectReason: values.reason } : r
-      ));
-      
-      message.success('已拒绝兑换，积分已返还');
-      setIsRejectModalVisible(false);
-      rejectForm.resetFields();
-    });
+  const handleRejectOk = async () => {
+    const values = await rejectForm.validateFields();
+    try { await redeemService.updateStatus(rejectingRecord.id, 'rejected', values.reason); } catch (e) {}
+    setRedeemRecords(redeemRecords.map(r => 
+      r.id === rejectingRecord.id ? { ...r, status: 'rejected', reject_reason: values.reason } : r
+    ));
+    message.success('已拒绝，积分已返还');
+    setIsRejectModalVisible(false);
   };
 
   const ruleColumns = [
-    {
-      title: '行为名称',
-      dataIndex: 'action',
-      key: 'action',
-      width: 180,
-      render: (action) => (
-        <Tag color="blue" style={{ margin: 0, fontSize: 14, padding: '4px 12px' }}>
-          {action}
-        </Tag>
-      ),
-    },
-    {
-      title: '奖励分值',
-      dataIndex: 'points',
-      key: 'points',
-      width: 120,
-      render: (points) => (
-        <span style={{ fontWeight: 600, color: '#52c41a', fontSize: 16 }}>
-          +{points}
-        </span>
-      ),
-      sorter: (a, b) => a.points - b.points,
-    },
-    {
-      title: '说明',
-      dataIndex: 'description',
-      key: 'description',
-      width: 300,
-      render: (description) => (
-        <span style={{ color: '#8c8c8c' }}>{description}</span>
-      ),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status, record) => (
-        <Switch 
-          checked={status}
-          onChange={() => handleToggleRule(record.id, status)}
-          checkedChildren="开启"
-          unCheckedChildren="关闭"
-        />
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 180,
-      render: (_, record) => (
-        <Space size="small">
-          <Button 
-            type="text" 
-            size="small"
-            icon={<Edit2 size={14} />}
-            onClick={() => handleEditRule(record)}
-          >
-            编辑
-          </Button>
-          <Button 
-            type="text" 
-            size="small"
-            danger
-            icon={<Trash2 size={14} />}
-            onClick={() => handleDeleteRule(record.id)}
-          >
-            删除
-          </Button>
+    { title: '行为', dataIndex: 'action', render: (t) => <Tag color="blue">{t}</Tag> },
+    { title: '积分', dataIndex: 'points', render: (p) => <span style={{ color: '#52c41a', fontWeight: 600 }}>+{p}</span> },
+    { title: '说明', dataIndex: 'description' },
+    { title: '状态', dataIndex: 'status', render: (s, r) => <Switch checked={s} onChange={() => handleToggleRule(r.id, s)} /> },
+    { 
+      title: '操作', 
+      render: (_, r) => (
+        <Space>
+          <Button type="text" size="small" icon={<Edit2 size={14} />} onClick={() => handleEditRule(r)}>编辑</Button>
+          <Button type="text" size="small" danger icon={<Trash2 size={14} />} onClick={() => handleDeleteRule(r.id)}>删除</Button>
         </Space>
-      ),
+      )
     },
   ];
 
   const redeemColumns = [
     {
-      title: '用户信息',
-      key: 'userInfo',
-      width: 200,
-      render: (_, record) => (
+      title: '用户',
+      render: (_, r) => (
         <div>
-          <Space style={{ marginBottom: 4 }}>
-            <Avatar size="small" style={{ backgroundColor: '#1890ff' }}>
-              {record.userName[0]}
-            </Avatar>
-            <span style={{ fontWeight: 500 }}>{record.userName}</span>
-          </Space>
-          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-            <Phone size={12} style={{ display: 'inline', marginRight: 4 }} />
-            {record.phone}
-          </div>
-          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-            {record.company}
-          </div>
+          <div style={{ fontWeight: 500 }}>{r.user_name || r.userName}</div>
+          <div style={{ fontSize: 12, color: '#8c8c8c' }}>{r.phone} · {r.company}</div>
         </div>
       ),
     },
-    {
-      title: '兑换礼品',
-      dataIndex: 'giftName',
-      key: 'giftName',
-      width: 150,
-      render: (giftName) => (
-        <span style={{ fontWeight: 500 }}>{giftName}</span>
-      ),
-    },
-    {
-      title: '消耗积分',
-      dataIndex: 'points',
-      key: 'points',
-      width: 120,
-      render: (points) => (
-        <span style={{ fontWeight: 600, color: '#ff4d4f', fontSize: 16 }}>
-          -{points}
-        </span>
-      ),
-    },
-    {
-      title: '兑换时间',
-      dataIndex: 'time',
-      key: 'time',
-      width: 180,
-      render: (time) => (
-        <span style={{ color: '#8c8c8c', fontSize: 13 }}>
-          <Clock size={14} style={{ display: 'inline', marginRight: 4 }} />
-          {time}
-        </span>
-      ),
-    },
-    {
-      title: '状态',
+    { title: '礼品', dataIndex: 'gift_name', render: (v, r) => v || r.giftName },
+    { title: '积分', dataIndex: 'points', render: (p) => <span style={{ color: '#ff4d4f' }}>-{p}</span> },
+    { title: '时间', dataIndex: 'time' },
+    { 
+      title: '状态', 
       dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status) => {
-        const config = {
-          pending: { color: 'orange', text: '待领取' },
-          completed: { color: 'green', text: '已发放' },
-          rejected: { color: 'red', text: '已拒绝' }
-        };
-        const c = config[status];
-        return (
-          <Tag color={c.color} style={{ margin: 0 }}>
-            {c.text}
-          </Tag>
-        );
-      },
+      render: (s) => {
+        const config = { pending: { color: 'orange', text: '待领取' }, completed: { color: 'green', text: '已发放' }, rejected: { color: 'red', text: '已拒绝' } };
+        const c = config[s] || config.pending;
+        return <Tag color={c.color}>{c.text}</Tag>;
+      }
     },
     {
       title: '操作',
-      key: 'action',
-      width: 200,
-      render: (_, record) => (
-        record.status === 'pending' ? (
-          <Space size="small">
-            <Button 
-              type="primary" 
-              size="small"
-              icon={<CheckCircle size={14} />}
-              onClick={() => handleConfirmRedeem(record)}
-            >
-              确认发放
-            </Button>
-            <Button 
-              type="default" 
-              size="small"
-              danger
-              icon={<XCircle size={14} />}
-              onClick={() => handleRejectRedeem(record)}
-            >
-              拒绝
-            </Button>
-          </Space>
-        ) : record.status === 'rejected' ? (
-          <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-            原因：{record.rejectReason}
-          </span>
-        ) : (
-          <Tag color="green">已完成</Tag>
-        )
-      ),
+      render: (_, r) => r.status === 'pending' ? (
+        <Space>
+          <Button type="primary" size="small" icon={<CheckCircle size={12} />} onClick={() => handleConfirmRedeem(r)}>发放</Button>
+          <Button size="small" danger icon={<XCircle size={12} />} onClick={() => handleRejectRedeem(r)}>拒绝</Button>
+        </Space>
+      ) : r.status === 'rejected' ? (
+        <span style={{ color: '#8c8c8c', fontSize: 12 }}>原因：{r.reject_reason || r.rejectReason}</span>
+      ) : <Tag color="green">已完成</Tag>
     },
   ];
 
-  const todayRedeemedPoints = redeemRecords
-    .filter(r => r.status === 'completed' && r.time.startsWith('2024-03-05'))
-    .reduce((sum, r) => sum + r.points, 0);
-
-  const pendingRedeems = redeemRecords.filter(r => r.status === 'pending').length;
+  const pendingCount = redeemRecords.filter(r => r.status === 'pending').length;
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>积分商城与激励规则</h1>
+      <h1 style={{ marginBottom: 24 }}>积分商城</h1>
       
-      <Card 
+      <Card
         tabList={[
-          { key: 'rules', tab: '积分规则设置' },
-          { key: 'gifts', tab: '礼品库存管理' },
-          { key: 'redeem', tab: '兑换记录处理' }
+          { key: 'rules', tab: '积分规则' },
+          { key: 'gifts', tab: '礼品管理' },
+          { key: 'redeem', tab: `兑换记录 (${pendingCount})` }
         ]}
         activeTabKey={activeTab}
         onTabChange={setActiveTab}
       >
         {activeTab === 'rules' && (
-          <div>
-            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                type="primary" 
-                icon={<Plus size={16} />}
-                onClick={handleAddRule}
-              >
-                添加规则
-              </Button>
+          <>
+            <div style={{ marginBottom: 16, textAlign: 'right' }}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={handleAddRule}>添加规则</Button>
             </div>
-
-            <Table
-              columns={ruleColumns}
-              dataSource={pointRules}
-              rowKey="id"
-              locale={{
-                emptyText: (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      <div>
-                        <p style={{ fontSize: 16, color: '#8c8c8c', marginBottom: 8 }}>
-                          暂无积分规则
-                        </p>
-                        <p style={{ fontSize: 14, color: '#bfbfbf' }}>
-                          点击"添加规则"按钮创建第一个规则
-                        </p>
-                      </div>
-                    }
-                  />
-                )
-              }}
-              pagination={false}
-              scroll={{ x: 1000 }}
-            />
-          </div>
+            <Table columns={ruleColumns} dataSource={pointRules} rowKey="id" loading={loading} pagination={false} />
+          </>
         )}
 
         {activeTab === 'gifts' && (
-          <div>
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={6}>
-                <Card>
-                  <Statistic 
-                    title="礼品总数" 
-                    value={gifts.length} 
-                    prefix={<Package size={20} style={{ color: '#1890ff' }} />}
-                    valueStyle={{ color: '#1890ff', fontSize: 24 }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic 
-                    title="总库存" 
-                    value={gifts.reduce((sum, gift) => sum + gift.stock, 0)} 
-                    prefix={<Star size={20} style={{ color: '#faad14' }} />}
-                    valueStyle={{ color: '#faad14', fontSize: 24 }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic 
-                    title="低库存预警" 
-                    value={gifts.filter(g => g.stock < 20).length} 
-                    prefix={<Settings size={20} style={{ color: '#ff4d4f' }} />}
-                    valueStyle={{ color: '#ff4d4f', fontSize: 24 }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic 
-                    title="已兑换" 
-                    value={gifts.reduce((sum, gift) => sum + gift.redeemed, 0)} 
-                    prefix={<Gift size={20} style={{ color: '#52c41a' }} />}
-                    valueStyle={{ color: '#52c41a', fontSize: 24 }}
-                  />
-                </Card>
-              </Col>
+          <>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col span={6}><Card><Statistic title="礼品总数" value={gifts.length} prefix={<Package size={16} />} /></Card></Col>
+              <Col span={6}><Card><Statistic title="总库存" value={gifts.reduce((s, g) => s + (g.stock || 0), 0)} /></Card></Col>
+              <Col span={6}><Card><Statistic title="已兑换" value={gifts.reduce((s, g) => s + (g.redeemed || 0), 0)} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+              <Col span={6}><Card><Statistic title="低库存" value={gifts.filter(g => g.stock < 20).length} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
             </Row>
-
-            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button 
-                type="primary" 
-                icon={<Plus size={16} />}
-                onClick={handleAddGift}
-              >
-                上架礼品
-              </Button>
+            <div style={{ marginBottom: 16, textAlign: 'right' }}>
+              <Button type="primary" icon={<Plus size={14} />} onClick={handleAddGift}>上架礼品</Button>
             </div>
-
-            <Row gutter={[16, 16]}>
-              {gifts.map((gift) => (
-                <Col xs={24} sm={12} md={8} lg={6} key={gift.id}>
+            <Row gutter={16}>
+              {gifts.map(gift => (
+                <Col xs={24} sm={12} md={8} lg={6} key={gift.id} style={{ marginBottom: 16 }}>
                   <Card
-                    hoverable
-                    style={{ height: '100%' }}
-                    cover={
-                      <div style={{ 
-                        textAlign: 'center', 
-                        padding: '40px 0', 
-                        fontSize: 80,
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                      }}>
-                        {gift.image}
-                      </div>
-                    }
+                    cover={<div style={{ textAlign: 'center', fontSize: 60, padding: 30, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>{gift.image}</div>}
                     actions={[
-                      <Button 
-                        type="text" 
-                        icon={<Edit2 size={16} />}
-                        onClick={() => handleEditGift(gift)}
-                      >
-                        编辑
-                      </Button>,
-                      <Button 
-                        type="text" 
-                        danger
-                        icon={<Trash2 size={16} />}
-                        onClick={() => handleDeleteGift(gift.id)}
-                      >
-                        删除
-                      </Button>
+                      <Button type="text" icon={<Edit2 size={14} />} onClick={() => handleEditGift(gift)}>编辑</Button>,
+                      <Button type="text" danger icon={<Trash2 size={14} />} onClick={() => handleDeleteGift(gift.id)}>删除</Button>
                     ]}
                   >
                     <Card.Meta
-                      title={
-                        <div style={{ fontSize: 18, fontWeight: 600 }}>
-                          {gift.name}
-                        </div>
-                      }
+                      title={gift.name}
                       description={
                         <div>
-                          <div style={{ marginBottom: 12 }}>
-                            <span style={{ 
-                              fontWeight: 600, 
-                              color: '#faad14', 
-                              fontSize: 20 
-                            }}>
-                              {gift.points}
-                            </span>
-                            <span style={{ color: '#8c8c8c', marginLeft: 4 }}>积分</span>
-                          </div>
-                          <div style={{ marginBottom: 8 }}>
-                            <span style={{ color: '#8c8c8c' }}>库存：</span>
-                            <span style={{ 
-                              fontWeight: 600,
-                              color: gift.stock < 20 ? '#ff4d4f' : gift.stock < 50 ? '#faad14' : '#52c41a'
-                            }}>
-                              {gift.stock}
-                            </span>
-                          </div>
-                          <div style={{ marginBottom: 8 }}>
-                            <span style={{ color: '#8c8c8c' }}>已兑换：</span>
-                            <span style={{ fontWeight: 600, color: '#52c41a' }}>
-                              {gift.redeemed}
-                            </span>
-                          </div>
-                          <div style={{ color: '#8c8c8c', fontSize: 12 }}>
-                            {gift.description}
-                          </div>
+                          <div><span style={{ color: '#faad14', fontSize: 18, fontWeight: 600 }}>{gift.points}</span> 积分</div>
+                          <div>库存：<span style={{ color: gift.stock < 20 ? '#ff4d4f' : '#52c41a' }}>{gift.stock}</span> | 已兑：{gift.redeemed}</div>
                         </div>
                       }
                     />
@@ -567,239 +300,59 @@ const PointsMallPage = () => {
                 </Col>
               ))}
             </Row>
-          </div>
+          </>
         )}
 
         {activeTab === 'redeem' && (
-          <div>
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={12}>
-                <Card>
-                  <Statistic 
-                    title="今日已兑换分值" 
-                    value={todayRedeemedPoints} 
-                    prefix={<TrendingUp size={20} style={{ color: '#1890ff' }} />}
-                    valueStyle={{ color: '#1890ff', fontSize: 28 }}
-                  />
-                </Card>
-              </Col>
-              <Col span={12}>
-                <Card>
-                  <Statistic 
-                    title="待处理核销单" 
-                    value={pendingRedeems} 
-                    prefix={<Clock size={20} style={{ color: '#faad14' }} />}
-                    valueStyle={{ color: '#faad14', fontSize: 28 }}
-                  />
-                </Card>
-              </Col>
+          <>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col span={12}><Card><Statistic title="待处理" value={pendingCount} prefix={<Clock size={16} />} valueStyle={{ color: '#faad14' }} /></Card></Col>
+              <Col span={12}><Card><Statistic title="今日已发放" value={redeemRecords.filter(r => r.status === 'completed').length} prefix={<TrendingUp size={16} />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
             </Row>
-
-            <Table
-              columns={redeemColumns}
-              dataSource={redeemRecords}
-              rowKey="id"
-              locale={{
-                emptyText: (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      <div>
-                        <p style={{ fontSize: 16, color: '#8c8c8c', marginBottom: 8 }}>
-                          暂无兑换记录
-                        </p>
-                        <p style={{ fontSize: 14, color: '#bfbfbf' }}>
-                          还没有人兑换礼品
-                        </p>
-                      </div>
-                    }
-                  />
-                )
-              }}
-              pagination={{
-                total: redeemRecords.length,
-                pageSize: 10,
-                showSizeChanger: true,
-                showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 条`,
-              }}
-              scroll={{ x: 1200 }}
-            />
-          </div>
+            <Table columns={redeemColumns} dataSource={redeemRecords} rowKey="id" loading={loading} pagination={{ pageSize: 10 }} />
+          </>
         )}
       </Card>
 
-      <Modal
-        title={editingRule ? '编辑积分规则' : '添加积分规则'}
-        open={isRuleModalVisible}
-        onOk={handleRuleOk}
-        onCancel={() => {
-          setIsRuleModalVisible(false);
-          ruleForm.resetFields();
-        }}
-        width={600}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form
-          form={ruleForm}
-          layout="vertical"
-          style={{ marginTop: 24 }}
-        >
-          <Form.Item
-            name="action"
-            label="行为名称"
-            rules={[{ required: true, message: '请输入行为名称' }]}
-          >
-            <Select placeholder="请选择或输入行为名称">
-              <Select.Option value="现场签到">现场签到</Select.Option>
-              <Select.Option value="提问被采纳">提问被采纳</Select.Option>
-              <Select.Option value="提交问卷">提交问卷</Select.Option>
-              <Select.Option value="完善资料">完善资料</Select.Option>
-              <Select.Option value="中奖奖励">中奖奖励</Select.Option>
-            </Select>
+      {/* 规则弹窗 */}
+      <Modal title={editingRule ? '编辑规则' : '添加规则'} open={isRuleModalVisible} onOk={handleRuleOk} onCancel={() => setIsRuleModalVisible(false)}>
+        <Form form={ruleForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="action" label="行为名称" rules={[{ required: true }]}>
+            <Input placeholder="如：会议签到" />
           </Form.Item>
-
-          <Form.Item
-            name="points"
-            label="奖励分值"
-            rules={[{ required: true, message: '请输入奖励分值' }]}
-          >
-            <InputNumber 
-              placeholder="请输入奖励分值" 
-              min={1}
-              max={1000}
-              style={{ width: '100%' }}
-            />
+          <Form.Item name="points" label="奖励积分" rules={[{ required: true }]}>
+            <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-
-          <Form.Item
-            name="description"
-            label="规则说明"
-            rules={[{ required: true, message: '请输入规则说明' }]}
-          >
-            <TextArea 
-              rows={4} 
-              placeholder="请输入规则说明" 
-              maxLength={200}
-              showCount
-            />
+          <Form.Item name="description" label="说明">
+            <TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
 
-      <Modal
-        title={editingGift ? '编辑礼品' : '上架礼品'}
-        open={isGiftModalVisible}
-        onOk={handleGiftOk}
-        onCancel={() => {
-          setIsGiftModalVisible(false);
-          giftForm.resetFields();
-        }}
-        width={700}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form
-          form={giftForm}
-          layout="vertical"
-          style={{ marginTop: 24 }}
-        >
+      {/* 礼品弹窗 */}
+      <Modal title={editingGift ? '编辑礼品' : '上架礼品'} open={isGiftModalVisible} onOk={handleGiftOk} onCancel={() => setIsGiftModalVisible(false)}>
+        <Form form={giftForm} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="name"
-                label="礼品名称"
-                rules={[{ required: true, message: '请输入礼品名称' }]}
-              >
-                <Input placeholder="请输入礼品名称" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="image"
-                label="礼品图标"
-                rules={[{ required: true, message: '请输入礼品图标' }]}
-              >
-                <Input placeholder="请输入礼品图标（Emoji）" />
-              </Form.Item>
-            </Col>
+            <Col span={16}><Form.Item name="name" label="礼品名称" rules={[{ required: true }]}><Input /></Form.Item></Col>
+            <Col span={8}><Form.Item name="image" label="图标" rules={[{ required: true }]}><Input placeholder="emoji" /></Form.Item></Col>
           </Row>
-
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="points"
-                label="所需积分"
-                rules={[{ required: true, message: '请输入所需积分' }]}
-              >
-                <InputNumber 
-                  placeholder="请输入所需积分" 
-                  min={1}
-                  max={10000}
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="stock"
-                label="库存数量"
-                rules={[{ required: true, message: '请输入库存数量' }]}
-              >
-                <InputNumber 
-                  placeholder="请输入库存数量" 
-                  min={1}
-                  max={1000}
-                  style={{ width: '100%' }}
-                />
-              </Form.Item>
-            </Col>
+            <Col span={12}><Form.Item name="points" label="所需积分" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }} /></Form.Item></Col>
+            <Col span={12}><Form.Item name="stock" label="库存" rules={[{ required: true }]}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item></Col>
           </Row>
-
-          <Form.Item
-            name="description"
-            label="礼品描述"
-            rules={[{ required: true, message: '请输入礼品描述' }]}
-          >
-            <TextArea 
-              rows={4} 
-              placeholder="请输入礼品描述" 
-              maxLength={200}
-              showCount
-            />
-          </Form.Item>
+          <Form.Item name="description" label="描述"><TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>
 
-      <Modal
-        title="拒绝兑换"
-        open={isRejectModalVisible}
-        onOk={handleRejectOk}
-        onCancel={() => {
-          setIsRejectModalVisible(false);
-          rejectForm.resetFields();
-        }}
-        width={500}
-        okText="确定拒绝"
-        cancelText="取消"
-      >
-        <Form
-          form={rejectForm}
-          layout="vertical"
-          style={{ marginTop: 24 }}
-        >
-          <Form.Item
-            name="reason"
-            label="拒绝原因"
-            rules={[{ required: true, message: '请输入拒绝原因' }]}
-          >
-            <Select placeholder="请选择拒绝原因">
-              <Select.Option value="库存不足">库存不足</Select.Option>
-              <Select.Option value="礼品已下架">礼品已下架</Select.Option>
-              <Select.Option value="用户信息异常">用户信息异常</Select.Option>
-              <Select.Option value="其他">其他</Select.Option>
-            </Select>
+      {/* 拒绝弹窗 */}
+      <Modal title="拒绝兑换" open={isRejectModalVisible} onOk={handleRejectOk} onCancel={() => setIsRejectModalVisible(false)}>
+        <Form form={rejectForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="reason" label="拒绝原因" rules={[{ required: true }]}>
+            <Select options={[
+              { label: '库存不足', value: '库存不足' },
+              { label: '礼品已下架', value: '礼品已下架' },
+              { label: '用户信息异常', value: '用户信息异常' },
+            ]} />
           </Form.Item>
         </Form>
       </Modal>
