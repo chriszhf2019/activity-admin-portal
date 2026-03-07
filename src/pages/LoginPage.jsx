@@ -1,34 +1,54 @@
 import { useState } from 'react';
-import { Form, Input, Button, Card, message } from 'antd';
-import { User, Lock } from 'lucide-react';
+import { Form, Input, Button, Card, message, Modal } from 'antd';
+import { User, Lock, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/supabase';
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
+  const [changePasswordVisible, setChangePasswordVisible] = useState(false);
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const navigate = useNavigate();
+  const [passwordForm] = Form.useForm();
 
-  // 管理员账号
-  const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'admin123'
+  const onFinish = async (values) => {
+    setLoading(true);
+    try {
+      const admin = await authService.login(values.username, values.password);
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('userRole', admin.role);
+      localStorage.setItem('userName', admin.name);
+      localStorage.setItem('username', admin.username);
+      message.success('登录成功');
+      navigate('/');
+    } catch (error) {
+      message.error(error.message || '登录失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onFinish = (values) => {
-    setLoading(true);
+  const handleChangePassword = async (values) => {
+    if (values.newPassword !== values.confirmPassword) {
+      message.error('两次输入的新密码不一致');
+      return;
+    }
     
-    setTimeout(() => {
-      if (values.username === ADMIN_CREDENTIALS.username && 
-          values.password === ADMIN_CREDENTIALS.password) {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('userRole', 'admin');
-        localStorage.setItem('userName', '超级管理员');
-        message.success('登录成功');
-        navigate('/');
-      } else {
-        message.error('用户名或密码错误');
-      }
-      setLoading(false);
-    }, 500);
+    setChangePasswordLoading(true);
+    try {
+      await authService.changePassword(
+        values.username,
+        values.oldPassword,
+        values.newPassword
+      );
+      message.success('密码修改成功，请使用新密码登录');
+      setChangePasswordVisible(false);
+      passwordForm.resetFields();
+    } catch (error) {
+      message.error(error.message || '密码修改失败');
+    } finally {
+      setChangePasswordLoading(false);
+    }
   };
 
   return (
@@ -93,7 +113,7 @@ const LoginPage = () => {
             />
           </Form.Item>
 
-          <Form.Item style={{ marginBottom: 0 }}>
+          <Form.Item style={{ marginBottom: 16 }}>
             <Button 
               type="primary" 
               htmlType="submit" 
@@ -109,10 +129,20 @@ const LoginPage = () => {
               登 录
             </Button>
           </Form.Item>
+
+          <div style={{ textAlign: 'center' }}>
+            <Button 
+              type="link" 
+              icon={<Key size={14} />}
+              onClick={() => setChangePasswordVisible(true)}
+            >
+              修改密码
+            </Button>
+          </div>
         </Form>
 
         <div style={{ 
-          marginTop: 24, 
+          marginTop: 16, 
           padding: 16, 
           background: '#f5f7fa', 
           borderRadius: 8,
@@ -123,6 +153,82 @@ const LoginPage = () => {
           </p>
         </div>
       </Card>
+
+      <Modal
+        title="修改密码"
+        open={changePasswordVisible}
+        onCancel={() => {
+          setChangePasswordVisible(false);
+          passwordForm.resetFields();
+        }}
+        footer={null}
+        width={400}
+      >
+        <Form
+          form={passwordForm}
+          layout="vertical"
+          onFinish={handleChangePassword}
+          style={{ marginTop: 24 }}
+        >
+          <Form.Item
+            name="username"
+            label="用户名"
+            rules={[{ required: true, message: '请输入用户名' }]}
+          >
+            <Input 
+              prefix={<User size={16} style={{ color: '#bfbfbf' }} />}
+              placeholder="请输入用户名"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="oldPassword"
+            label="原密码"
+            rules={[{ required: true, message: '请输入原密码' }]}
+          >
+            <Input.Password 
+              prefix={<Lock size={16} style={{ color: '#bfbfbf' }} />}
+              placeholder="请输入原密码"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="newPassword"
+            label="新密码"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              { min: 6, message: '密码至少6位' }
+            ]}
+          >
+            <Input.Password 
+              prefix={<Key size={16} style={{ color: '#bfbfbf' }} />}
+              placeholder="请输入新密码（至少6位）"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="confirmPassword"
+            label="确认新密码"
+            rules={[{ required: true, message: '请确认新密码' }]}
+          >
+            <Input.Password 
+              prefix={<Key size={16} style={{ color: '#bfbfbf' }} />}
+              placeholder="请再次输入新密码"
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              loading={changePasswordLoading}
+              block
+            >
+              确认修改
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
