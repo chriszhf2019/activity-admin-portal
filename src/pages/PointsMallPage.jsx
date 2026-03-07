@@ -21,8 +21,6 @@ import {
   Upload,
   Select
 } from 'antd';
-
-const { TextArea } = Input;
 import { 
   Gift, 
   Plus, 
@@ -39,128 +37,16 @@ import {
   User,
   Phone
 } from 'lucide-react';
+import { GIFTS, REDEEM_RECORDS, POINT_RULES } from '../constants/realData';
+
+const { TextArea } = Input;
 
 const PointsMallPage = () => {
   const [activeTab, setActiveTab] = useState('rules');
   
-  const [pointRules, setPointRules] = useState([
-    { id: 1, action: '现场签到', points: 10, description: '会议现场扫码签到获得积分', status: true },
-    { id: 2, action: '提问被采纳', points: 20, description: '提问被主持人采纳上墙获得积分', status: true },
-    { id: 3, action: '提交问卷', points: 30, description: '完成会议反馈问卷获得积分', status: true },
-    { id: 4, action: '完善资料', points: 50, description: '完善个人资料信息获得积分', status: true },
-    { id: 5, action: '中奖奖励', points: 100, description: '现场抽奖中奖获得积分', status: false }
-  ]);
-
-  const [gifts, setGifts] = useState([
-    { 
-      id: 1, 
-      name: '精美雨伞', 
-      points: 500, 
-      stock: 50, 
-      redeemed: 12,
-      image: '🌂',
-      description: '优质材质，防雨防晒'
-    },
-    { 
-      id: 2, 
-      name: '定制笔记本', 
-      points: 800, 
-      stock: 30, 
-      redeemed: 8,
-      image: '📓',
-      description: '会议定制，高端商务'
-    },
-    { 
-      id: 3, 
-      name: '保温杯', 
-      points: 300, 
-      stock: 100, 
-      redeemed: 25,
-      image: '☕',
-      description: '304不锈钢，保冷保热'
-    },
-    { 
-      id: 4, 
-      name: '充电宝', 
-      points: 600, 
-      stock: 25, 
-      redeemed: 15,
-      image: '🔋',
-      description: '10000mAh，快速充电'
-    },
-    { 
-      id: 5, 
-      name: '蓝牙耳机', 
-      points: 1000, 
-      stock: 15, 
-      redeemed: 5,
-      image: '🎧',
-      description: '降噪功能，音质清晰'
-    },
-    { 
-      id: 6, 
-      name: '商务背包', 
-      points: 1500, 
-      stock: 10, 
-      redeemed: 3,
-      image: '🎒',
-      description: '防水耐磨，多层收纳'
-    }
-  ]);
-
-  const [redeemRecords, setRedeemRecords] = useState([
-    { 
-      id: 1, 
-      userName: '张三', 
-      phone: '138****1234',
-      company: '科技有限公司',
-      giftName: '精美雨伞', 
-      points: 500, 
-      time: '2024-03-05 10:30:00', 
-      status: 'pending' 
-    },
-    { 
-      id: 2, 
-      userName: '李四', 
-      phone: '139****5678',
-      company: '贸易公司',
-      giftName: '定制笔记本', 
-      points: 800, 
-      time: '2024-03-05 11:20:00', 
-      status: 'completed' 
-    },
-    { 
-      id: 3, 
-      userName: '王五', 
-      phone: '137****9012',
-      company: '实业集团',
-      giftName: '保温杯', 
-      points: 300, 
-      time: '2024-03-05 14:15:00', 
-      status: 'pending' 
-    },
-    { 
-      id: 4, 
-      userName: '赵六', 
-      phone: '136****3456',
-      company: '网络科技',
-      giftName: '充电宝', 
-      points: 600, 
-      time: '2024-03-05 15:30:00', 
-      status: 'rejected',
-      rejectReason: '库存不足'
-    },
-    { 
-      id: 5, 
-      userName: '孙七', 
-      phone: '158****7890',
-      company: '数据服务',
-      giftName: '蓝牙耳机', 
-      points: 1000, 
-      time: '2024-03-05 16:45:00', 
-      status: 'pending' 
-    }
-  ]);
+  const [pointRules, setPointRules] = useState(POINT_RULES);
+  const [gifts, setGifts] = useState(GIFTS);
+  const [redeemRecords, setRedeemRecords] = useState(REDEEM_RECORDS);
 
   const [isRuleModalVisible, setIsRuleModalVisible] = useState(false);
   const [isGiftModalVisible, setIsGiftModalVisible] = useState(false);

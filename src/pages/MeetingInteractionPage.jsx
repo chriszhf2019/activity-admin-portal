@@ -30,55 +30,10 @@ import {
   Plus,
   Bell
 } from 'lucide-react';
+import { QUESTIONS, USERS } from '../constants/realData';
 
 const MeetingInteractionPage = () => {
-  const [questions, setQuestions] = useState([
-    {
-      id: 1,
-      asker: '张三',
-      question: '请问这个产品的定价策略是什么？',
-      time: '2024-03-05 10:30:00',
-      status: 'pending',
-      isFeatured: false,
-      isAnswered: false
-    },
-    {
-      id: 2,
-      asker: '李四',
-      question: '关于售后服务的问题',
-      time: '2024-03-05 11:15:00',
-      status: 'pending',
-      isFeatured: false,
-      isAnswered: false
-    },
-    {
-      id: 3,
-      asker: '王五',
-      question: '是否支持定制化开发？',
-      time: '2024-03-05 14:20:00',
-      status: 'approved',
-      isFeatured: true,
-      isAnswered: false
-    },
-    {
-      id: 4,
-      asker: '赵六',
-      question: '技术支持的时间是多久？',
-      time: '2024-03-05 15:45:00',
-      status: 'approved',
-      isFeatured: false,
-      isAnswered: true
-    },
-    {
-      id: 5,
-      asker: '孙七',
-      question: '关于合作模式的疑问',
-      time: '2024-03-05 16:30:00',
-      status: 'pending',
-      isFeatured: false,
-      isAnswered: false
-    }
-  ]);
+  const [questions, setQuestions] = useState(QUESTIONS);
 
   const [checkinData, setCheckinData] = useState({
     registered: 156,

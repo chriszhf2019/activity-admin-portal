@@ -127,7 +127,10 @@ const MainLayout = () => {
 
   const handleUserMenuClick = ({ key }) => {
     if (key === 'logout') {
-      console.log('退出登录');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userName');
+      navigate('/login');
     }
   };
 

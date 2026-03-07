@@ -38,7 +38,7 @@ import {
   Download,
   MessageSquare
 } from 'lucide-react';
-import { MOCK_ACTIVITIES, CATEGORY_OPTIONS, PRIORITY_OPTIONS, STATUS_OPTIONS } from '../constants/mockData';
+import { ACTIVITIES } from '../constants/realData';
 import { useNavigate } from 'react-router-dom';
 
 const { Search: SearchInput } = Input;
@@ -47,7 +47,7 @@ const { RangePicker } = DatePicker;
 
 const ActivitiesPage = () => {
   const navigate = useNavigate();
-  const [activities, setActivities] = useState(MOCK_ACTIVITIES);
+  const [activities, setActivities] = useState(ACTIVITIES);
   const [searchText, setSearchText] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isQrCodeVisible, setIsQrCodeVisible] = useState(false);

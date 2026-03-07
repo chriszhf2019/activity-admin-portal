@@ -38,12 +38,12 @@ import {
   MessageSquare,
   Ban
 } from 'lucide-react';
-import { MOCK_USERS, USER_ACTIVITIES, USER_POINTS_RECORDS, USER_FEEDBACKS } from '../constants/userData';
+import { USERS, USER_ACTIVITIES, POINTS_RECORDS, USER_FEEDBACKS } from '../constants/realData';
 
 const { Search: SearchInput } = Input;
 
 const UsersPage = () => {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState(USERS);
   const [searchText, setSearchText] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [infoFilter, setInfoFilter] = useState('all');
@@ -615,10 +615,10 @@ const UsersPage = () => {
                             ),
                           },
                         ]}
-                        dataSource={USER_POINTS_RECORDS.filter(record => record.userId === selectedUser?.id)}
+                        dataSource={POINTS_RECORDS.filter(record => record.userId === selectedUser?.id)}
                         rowKey="id"
                         pagination={{
-                          total: USER_POINTS_RECORDS.filter(record => record.userId === selectedUser?.id).length,
+                          total: POINTS_RECORDS.filter(record => record.userId === selectedUser?.id).length,
                           pageSize: 5,
                           showSizeChanger: true,
                           showQuickJumper: true,

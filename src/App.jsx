@@ -8,12 +8,27 @@ import MeetingManagementPage from './pages/MeetingManagementPage';
 import PointsMallPage from './pages/PointsMallPage';
 import SettingsPage from './pages/SettingsPage';
 import LiveWallPage from './pages/LiveWallPage';
+import LoginPage from './pages/LoginPage';
+
+// 路由保护组件
+const ProtectedRoute = ({ children }) => {
+  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
 
 function App() {
   return (
     <HashRouter>
       <Routes>
-        <Route path="/" element={<MainLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }>
           <Route index element={<HomePage />} />
           <Route path="activities" element={<ActivitiesPage />} />
           <Route path="users" element={<UsersPage />} />
