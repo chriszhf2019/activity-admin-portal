@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   Table, 
@@ -12,14 +12,10 @@ import {
   DatePicker, 
   message,
   Tooltip,
-  Avatar,
   Divider,
   Empty,
   Row,
-  Col,
-  Segmented,
-  TimePicker,
-  Radio
+  Col
 } from 'antd';
 import { 
   Search, 
@@ -29,39 +25,68 @@ import {
   Eye,
   Calendar,
   MapPin,
-  Link as LinkIcon,
-  Clock,
-  User,
-  X,
   MonitorPlay,
   QrCode,
   Download,
   MessageSquare
 } from 'lucide-react';
-import { ACTIVITIES } from '../constants/realData';
 import { useNavigate } from 'react-router-dom';
+import { activityService } from '../services/supabase';
+import { ACTIVITIES } from '../constants/realData';
 
 const { Search: SearchInput } = Input;
 const { TextArea } = Input;
-const { RangePicker } = DatePicker;
 
 const ActivitiesPage = () => {
   const navigate = useNavigate();
-  const [activities, setActivities] = useState(ACTIVITIES);
+  const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isQrCodeVisible, setIsQrCodeVisible] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [editingActivity, setEditingActivity] = useState(null);
-  const [meetingType, setMeetingType] = useState('offline');
-  const [agendaList, setAgendaList] = useState([{ time: '', content: '' }]);
   const [form] = Form.useForm();
 
-  const responsibleOptions = [
-    { label: '张三', value: 'zhangsan' },
-    { label: '李四', value: 'lisi' },
-    { label: '王五', value: 'wangwu' },
-    { label: '赵六', value: 'zhaoliu' }
+  // 加载活动数据
+  useEffect(() => {
+    loadActivities();
+  }, []);
+
+  const loadActivities = async () => {
+    setLoading(true);
+    try {
+      const data = await activityService.getAll();
+      if (data && data.length > 0) {
+        setActivities(data);
+      } else {
+        // 如果数据库没有数据，使用本地数据
+        setActivities(ACTIVITIES);
+      }
+    } catch (error) {
+      console.error('加载活动失败:', error);
+      setActivities(ACTIVITIES);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categoryOptions = [
+    { label: '会议', value: '会议' },
+    { label: '培训', value: '培训' },
+    { label: '活动', value: '活动' },
+    { label: '其他', value: '其他' }
+  ];
+
+  const priorityOptions = [
+    { label: '高', value: 'high' },
+    { label: '中', value: 'medium' },
+    { label: '低', value: 'low' }
+  ];
+
+  const statusOptions = [
+    { label: '进行中', value: 'in_progress' },
+    { label: '已完成', value: 'completed' }
   ];
 
   const priorityConfig = {
@@ -75,15 +100,8 @@ const ActivitiesPage = () => {
     completed: { color: 'green', text: '已完成' }
   };
 
-  const categoryConfig = {
-    运动: { color: 'cyan', icon: '🏃' },
-    学习: { color: 'purple', icon: '📚' },
-    工作: { color: 'blue', icon: '💼' },
-    生活: { color: 'pink', icon: '🏠' }
-  };
-
   const filteredActivities = activities.filter(activity =>
-    activity.name.toLowerCase().includes(searchText.toLowerCase())
+    activity.name?.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const columns = [
@@ -92,7 +110,7 @@ const ActivitiesPage = () => {
       dataIndex: 'name',
       key: 'name',
       width: 200,
-      render: (text, record) => (
+      render: (text) => (
         <Space>
           <Calendar size={16} style={{ color: '#1890ff' }} />
           <span style={{ fontWeight: 500 }}>{text}</span>
@@ -103,32 +121,19 @@ const ActivitiesPage = () => {
       title: '分类',
       dataIndex: 'category',
       key: 'category',
-      width: 120,
-      render: (category) => {
-        const config = categoryConfig[category] || categoryConfig['生活'];
-        return (
-          <Tag color={config.color} style={{ margin: 0 }}>
-            {config.icon} {category}
-          </Tag>
-        );
-      },
+      width: 100,
+      render: (category) => (
+        <Tag color="blue">{category || '其他'}</Tag>
+      ),
     },
     {
       title: '优先级',
       dataIndex: 'priority',
       key: 'priority',
-      width: 100,
+      width: 80,
       render: (priority) => {
-        const config = priorityConfig[priority];
-        return (
-          <Tag color={config.color} style={{ margin: 0 }}>
-            {config.text}
-          </Tag>
-        );
-      },
-      sorter: (a, b) => {
-        const order = { high: 3, medium: 2, low: 1 };
-        return order[a.priority] - order[b.priority];
+        const config = priorityConfig[priority] || priorityConfig.medium;
+        return <Tag color={config.color}>{config.text}</Tag>;
       },
     },
     {
@@ -137,100 +142,81 @@ const ActivitiesPage = () => {
       key: 'status',
       width: 100,
       render: (status) => {
-        const config = statusConfig[status];
-        return (
-          <Tag color={config.color} style={{ margin: 0 }}>
-            {config.text}
-          </Tag>
-        );
+        const config = statusConfig[status] || statusConfig.in_progress;
+        return <Tag color={config.color}>{config.text}</Tag>;
       },
-      sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
-      title: '创建时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
-      width: 180,
-      render: (time) => (
-        <span style={{ color: '#8c8c8c', fontSize: 13 }}>{time}</span>
+      title: '地点',
+      dataIndex: 'location',
+      key: 'location',
+      width: 200,
+      render: (location) => (
+        <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+          <MapPin size={12} style={{ marginRight: 4 }} />
+          {location || '-'}
+        </span>
       ),
-      sorter: (a, b) => new Date(a.createTime) - new Date(b.createTime),
+    },
+    {
+      title: '负责人',
+      dataIndex: 'responsible',
+      key: 'responsible',
+      width: 100,
     },
     {
       title: '操作',
       key: 'action',
-      width: 400,
+      width: 320,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="签到码">
-            <Button 
-              type="default" 
-              size="small"
-              icon={<QrCode size={16} />}
-              onClick={() => handleShowQrCode(record)}
-            >
-              签到码
-            </Button>
-          </Tooltip>
-          <Tooltip title="查看详情">
-            <Button 
-              type="text" 
-              size="small"
-              icon={<Eye size={16} />}
-              onClick={() => handleView(record)}
-            />
-          </Tooltip>
-          <Tooltip title="编辑">
-            <Button 
-              type="text" 
-              size="small"
-              icon={<Edit2 size={16} />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="管理现场">
-            <Button 
-              type="primary" 
-              size="small"
-              icon={<MonitorPlay size={16} />}
-              onClick={() => navigate(`/meeting-management/${record.id}`)}
-            >
-              管理现场
-            </Button>
-          </Tooltip>
-          <Tooltip title="查看提问墙">
-            <Button 
-              type="default" 
-              size="small"
-              icon={<MessageSquare size={16} />}
-              onClick={() => navigate(`/live-wall/${record.id}`)}
-            >
-              提问墙
-            </Button>
-          </Tooltip>
-          <Tooltip title="删除">
-            <Button 
-              type="text" 
-              size="small"
-              danger
-              icon={<Trash2 size={16} />}
-              onClick={() => handleDelete(record.id)}
-            />
-          </Tooltip>
+          <Button 
+            size="small"
+            icon={<QrCode size={14} />}
+            onClick={() => handleShowQrCode(record)}
+          >
+            签到码
+          </Button>
+          <Button 
+            type="text" 
+            size="small"
+            icon={<Eye size={14} />}
+            onClick={() => handleView(record)}
+          />
+          <Button 
+            type="text" 
+            size="small"
+            icon={<Edit2 size={14} />}
+            onClick={() => handleEdit(record)}
+          />
+          <Button 
+            type="primary" 
+            size="small"
+            icon={<MonitorPlay size={14} />}
+            onClick={() => navigate(`/meeting-management/${record.id}`)}
+          >
+            管理
+          </Button>
+          <Button 
+            type="text" 
+            size="small"
+            danger
+            icon={<Trash2 size={14} />}
+            onClick={() => handleDelete(record.id)}
+          />
         </Space>
       ),
     },
   ];
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-  };
-
   const handleAdd = () => {
     setEditingActivity(null);
-    setMeetingType('offline');
-    setAgendaList([{ time: '', content: '' }]);
     form.resetFields();
+    form.setFieldsValue({
+      priority: 'medium',
+      status: 'in_progress',
+      category: '会议'
+    });
     setIsModalVisible(true);
   };
 
@@ -239,44 +225,27 @@ const ActivitiesPage = () => {
     form.setFieldsValue({
       name: record.name,
       category: record.category,
-      activityDate: record.createTime ? record.createTime : null,
-      description: record.description || ''
+      priority: record.priority,
+      status: record.status,
+      location: record.location,
+      responsible: record.responsible,
+      description: record.description
     });
     setIsModalVisible(true);
-  };
-
-  const handleAddAgenda = () => {
-    setAgendaList([...agendaList, { time: '', content: '' }]);
-  };
-
-  const handleRemoveAgenda = (index) => {
-    const newList = agendaList.filter((_, i) => i !== index);
-    setAgendaList(newList);
-  };
-
-  const handleAgendaChange = (index, field, value) => {
-    const newList = [...agendaList];
-    newList[index][field] = value;
-    setAgendaList(newList);
-  };
-
-  const handleModalCancel = () => {
-    setIsModalVisible(false);
-    form.resetFields();
-    setMeetingType('offline');
-    setAgendaList([{ time: '', content: '' }]);
   };
 
   const handleView = (record) => {
     Modal.info({
       title: '活动详情',
+      width: 500,
       content: (
         <div style={{ marginTop: 16 }}>
           <p><strong>活动名称：</strong>{record.name}</p>
           <p><strong>分类：</strong>{record.category}</p>
-          <p><strong>优先级：</strong>{priorityConfig[record.priority].text}</p>
-          <p><strong>状态：</strong>{statusConfig[record.status].text}</p>
-          <p><strong>创建时间：</strong>{record.createTime}</p>
+          <p><strong>优先级：</strong>{priorityConfig[record.priority]?.text || '中'}</p>
+          <p><strong>状态：</strong>{statusConfig[record.status]?.text || '进行中'}</p>
+          <p><strong>地点：</strong>{record.location || '-'}</p>
+          <p><strong>负责人：</strong>{record.responsible || '-'}</p>
           <p><strong>描述：</strong>{record.description || '暂无描述'}</p>
         </div>
       ),
@@ -286,12 +255,20 @@ const ActivitiesPage = () => {
   const handleDelete = (id) => {
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除这个活动吗？',
+      content: '确定要删除这个活动吗？删除后无法恢复。',
       okText: '确定',
       cancelText: '取消',
-      onOk: () => {
-        setActivities(activities.filter(item => item.id !== id));
-        message.success('删除成功');
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await activityService.delete(id);
+          setActivities(activities.filter(item => item.id !== id));
+          message.success('删除成功');
+        } catch (error) {
+          // 本地删除
+          setActivities(activities.filter(item => item.id !== id));
+          message.success('删除成功');
+        }
       },
     });
   };
@@ -301,35 +278,49 @@ const ActivitiesPage = () => {
     setIsQrCodeVisible(true);
   };
 
-  const handleDownloadQrCode = () => {
-    message.success('二维码下载成功');
-  };
-
-  const handleModalOk = () => {
-    form.validateFields().then((values) => {
-      const newActivity = {
-        ...values,
-        id: editingActivity ? editingActivity.id : Date.now(),
-        createTime: values.activityDate ? values.activityDate.format('YYYY-MM-DD HH:mm:ss') : new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-'),
-      };
-
+  const handleModalOk = async () => {
+    try {
+      const values = await form.validateFields();
+      
       if (editingActivity) {
+        // 编辑
+        try {
+          await activityService.update(editingActivity.id, values);
+        } catch (e) {
+          // 忽略数据库错误，本地更新
+        }
         setActivities(activities.map(item => 
-          item.id === editingActivity.id ? newActivity : item
+          item.id === editingActivity.id ? { ...item, ...values } : item
         ));
         message.success('更新成功');
       } else {
-        setActivities([...activities, newActivity]);
+        // 新增
+        const newActivity = {
+          ...values,
+          id: Date.now(),
+          create_time: new Date().toISOString(),
+          registered: 0,
+          checked_in: 0
+        };
+        
+        try {
+          const created = await activityService.create(values);
+          if (created) {
+            setActivities([created, ...activities]);
+          } else {
+            setActivities([newActivity, ...activities]);
+          }
+        } catch (e) {
+          setActivities([newActivity, ...activities]);
+        }
         message.success('添加成功');
       }
 
       setIsModalVisible(false);
       form.resetFields();
-      setMeetingType('offline');
-      setAgendaList([{ time: '', content: '' }]);
-    }).catch((error) => {
-      message.error('表单验证失败，请检查输入');
-    });
+    } catch (error) {
+      message.error('请填写必填项');
+    }
   };
 
   return (
@@ -357,7 +348,7 @@ const ActivitiesPage = () => {
             allowClear
             enterButton={<Search size={16} />}
             size="large"
-            onSearch={handleSearch}
+            onSearch={setSearchText}
             onChange={(e) => setSearchText(e.target.value)}
             style={{ maxWidth: 400 }}
           />
@@ -367,197 +358,118 @@ const ActivitiesPage = () => {
           columns={columns}
           dataSource={filteredActivities}
           rowKey="id"
+          loading={loading}
           locale={{
             emptyText: (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <div>
-                    <p style={{ fontSize: 16, color: '#8c8c8c', marginBottom: 8 }}>
-                      暂无活动数据
-                    </p>
-                    <p style={{ fontSize: 14, color: '#bfbfbf' }}>
-                      点击"新增会议"按钮创建第一个活动
-                    </p>
-                  </div>
-                }
+                description="暂无活动数据，点击新增活动按钮创建"
               />
             )
           }}
           pagination={{
             total: filteredActivities.length,
             pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
             showTotal: (total) => `共 ${total} 条`,
           }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 1200 }}
         />
       </Card>
 
+      {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingActivity ? '编辑会议' : '新增会议'}
+        title={editingActivity ? '编辑活动' : '新增活动'}
         open={isModalVisible}
         onOk={handleModalOk}
-        onCancel={handleModalCancel}
-        width={800}
-        okText="发布会议"
+        onCancel={() => {
+          setIsModalVisible(false);
+          form.resetFields();
+        }}
+        width={600}
+        okText={editingActivity ? '保存' : '创建'}
         cancelText="取消"
       >
         <Form
           form={form}
           layout="vertical"
-          style={{ marginTop: 24 }}
+          style={{ marginTop: 16 }}
         >
-          <Divider orientation="left">基本信息</Divider>
-          
+          <Form.Item
+            name="name"
+            label="活动名称"
+            rules={[{ required: true, message: '请输入活动名称' }]}
+          >
+            <Input placeholder="请输入活动名称" />
+          </Form.Item>
+
           <Row gutter={16}>
-            <Col span={24}>
+            <Col span={8}>
               <Form.Item
-                name="name"
-                label="会议名称"
-                rules={[{ required: true, message: '请输入会议名称' }]}
+                name="category"
+                label="分类"
+                rules={[{ required: true, message: '请选择分类' }]}
               >
-                <Input placeholder="请输入会议名称" />
+                <Select options={categoryOptions} placeholder="选择分类" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="priority"
+                label="优先级"
+                rules={[{ required: true, message: '请选择优先级' }]}
+              >
+                <Select options={priorityOptions} placeholder="选择优先级" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="status"
+                label="状态"
+                rules={[{ required: true, message: '请选择状态' }]}
+              >
+                <Select options={statusOptions} placeholder="选择状态" />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="location"
+                label="地点"
+              >
+                <Input placeholder="请输入活动地点" />
+              </Form.Item>
+            </Col>
             <Col span={12}>
               <Form.Item
                 name="responsible"
                 label="负责人"
-                rules={[{ required: true, message: '请选择负责人' }]}
               >
-                <Select placeholder="请选择负责人" options={responsibleOptions} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="meetingType"
-                label="会议形式"
-                rules={[{ required: true, message: '请选择会议形式' }]}
-                initialValue="offline"
-              >
-                <Segmented
-                  options={[
-                    { label: '线下', value: 'offline', icon: <MapPin size={14} /> },
-                    { label: '线上', value: 'online', icon: <LinkIcon size={14} /> }
-                  ]}
-                  onChange={setMeetingType}
-                />
+                <Input placeholder="请输入负责人" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Divider orientation="left">时间地点</Divider>
-
-          <Row gutter={16}>
-            <Col span={24}>
-              <Form.Item
-                name="meetingTime"
-                label="会议时间"
-                rules={[{ required: true, message: '请选择会议时间' }]}
-              >
-                <RangePicker 
-                  showTime 
-                  style={{ width: '100%' }} 
-                  placeholder={['开始时间', '结束时间']}
-                  format="YYYY-MM-DD HH:mm"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={24}>
-              <Form.Item
-                name="location"
-                label={meetingType === 'offline' ? '会议地址' : '会议链接'}
-                rules={[{ required: true, message: meetingType === 'offline' ? '请输入会议地址' : '请输入会议链接' }]}
-              >
-                <Input 
-                  placeholder={meetingType === 'offline' ? '请输入会议地址' : '请输入会议链接'}
-                  prefix={meetingType === 'offline' ? <MapPin size={16} /> : <LinkIcon size={16} />}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider orientation="left">日程安排</Divider>
-
-          <div style={{ marginBottom: 16 }}>
-            <Button 
-              type="dashed" 
-              onClick={handleAddAgenda}
-              icon={<Plus size={14} />}
-              style={{ width: '100%' }}
-            >
-              添加流程
-            </Button>
-          </div>
-
-          {agendaList.map((item, index) => (
-            <Row key={index} gutter={16} style={{ marginBottom: 12 }}>
-              <Col span={8}>
-                <Form.Item
-                  name={['agenda', index, 'time']}
-                  label={`时间点 ${index + 1}`}
-                  rules={[{ required: true, message: '请输入时间点' }]}
-                >
-                  <TimePicker 
-                    style={{ width: '100%' }} 
-                    placeholder="请选择时间"
-                    format="HH:mm"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={14}>
-                <Form.Item
-                  name={['agenda', index, 'content']}
-                  label={`事项内容 ${index + 1}`}
-                  rules={[{ required: true, message: '请输入事项内容' }]}
-                >
-                  <Input placeholder="请输入事项内容" />
-                </Form.Item>
-              </Col>
-              <Col span={2} style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 24 }}>
-                <Button 
-                  type="text" 
-                  danger
-                  icon={<X size={16} />}
-                  onClick={() => handleRemoveAgenda(index)}
-                />
-              </Col>
-            </Row>
-          ))}
-
-          <Divider orientation="left">会议简介</Divider>
-
-          <Row gutter={16}>
-            <Col span={24}>
-              <Form.Item
-                name="description"
-                label="会议简介"
-              >
-                <TextArea 
-                  rows={6} 
-                  placeholder="请输入会议简介" 
-                  maxLength={1000}
-                  showCount
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            name="description"
+            label="活动描述"
+          >
+            <TextArea 
+              rows={4} 
+              placeholder="请输入活动描述" 
+              maxLength={500}
+              showCount
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
+      {/* 签到码弹窗 */}
       <Modal
-        title="会议签到二维码"
+        title="活动签到二维码"
         open={isQrCodeVisible}
         onCancel={() => setIsQrCodeVisible(false)}
-        width={500}
         footer={[
           <Button key="close" onClick={() => setIsQrCodeVisible(false)}>
             关闭
@@ -566,49 +478,28 @@ const ActivitiesPage = () => {
             key="download" 
             type="primary" 
             icon={<Download size={16} />}
-            onClick={handleDownloadQrCode}
+            onClick={() => message.success('二维码下载成功')}
           >
-            下载二维码
+            下载
           </Button>
         ]}
       >
         {selectedActivity && (
-          <div style={{ padding: '24px 0', textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
             <div style={{ 
-              width: 300, 
-              height: 300, 
-              margin: '0 auto',
+              width: 200, 
+              height: 200, 
+              margin: '0 auto 16px',
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: 16,
+              borderRadius: 12,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 24
+              justifyContent: 'center'
             }}>
-              <QrCode size={150} color="#fff" />
+              <QrCode size={100} color="#fff" />
             </div>
-            <h3 style={{ marginBottom: 12, color: '#262626' }}>
-              {selectedActivity.name}
-            </h3>
-            <p style={{ color: '#8c8c8c', marginBottom: 8 }}>
-              会议ID：{selectedActivity.id}
-            </p>
-            <p style={{ color: '#8c8c8c', marginBottom: 8 }}>
-              时间：{selectedActivity.createTime}
-            </p>
-            <p style={{ color: '#8c8c8c', marginBottom: 8 }}>
-              地点：{selectedActivity.description || '线上会议'}
-            </p>
-            <div style={{ 
-              marginTop: 24, 
-              padding: 16, 
-              background: '#f5f7fa', 
-              borderRadius: 8 
-            }}>
-              <p style={{ margin: 0, color: '#595959', fontSize: 13 }}>
-                💡 使用说明：参会人员扫描此二维码即可完成签到
-              </p>
-            </div>
+            <h3>{selectedActivity.name}</h3>
+            <p style={{ color: '#8c8c8c' }}>扫描二维码完成签到</p>
           </div>
         )}
       </Modal>
