@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+const { TextArea } = Input;
+
 const MeetingManagementPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();

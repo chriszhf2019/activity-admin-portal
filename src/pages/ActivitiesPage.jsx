@@ -46,6 +46,7 @@ const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
 const ActivitiesPage = () => {
+  const navigate = useNavigate();
   const [activities, setActivities] = useState(MOCK_ACTIVITIES);
   const [searchText, setSearchText] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);

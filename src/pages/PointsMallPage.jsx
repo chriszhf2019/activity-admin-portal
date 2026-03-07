@@ -19,9 +19,10 @@ import {
   Switch,
   Empty,
   Upload,
-  Select,
-  TextArea
+  Select
 } from 'antd';
+
+const { TextArea } = Input;
 import { 
   Gift, 
   Plus, 
