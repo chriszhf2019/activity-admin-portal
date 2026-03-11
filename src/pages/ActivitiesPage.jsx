@@ -28,7 +28,10 @@ import {
   MonitorPlay,
   QrCode,
   Download,
-  MessageSquare
+  MessageSquare,
+  Link,
+  Clock,
+  PlusCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { activityService } from '../services/supabase';
@@ -42,6 +45,7 @@ const ActivitiesPage = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [activityTypeFilter, setActivityTypeFilter] = useState('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isQrCodeVisible, setIsQrCodeVisible] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
@@ -78,6 +82,11 @@ const ActivitiesPage = () => {
     { label: '其他', value: '其他' }
   ];
 
+  const activityTypeOptions = [
+    { label: '线上活动', value: 'online' },
+    { label: '线下活动', value: 'offline' }
+  ];
+
   const priorityOptions = [
     { label: '高', value: 'high' },
     { label: '中', value: 'medium' },
@@ -100,9 +109,16 @@ const ActivitiesPage = () => {
     completed: { color: 'green', text: '已完成' }
   };
 
-  const filteredActivities = activities.filter(activity =>
-    activity.name?.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const activityTypeConfig = {
+    online: { color: 'purple', text: '线上', icon: <Link size={14} /> },
+    offline: { color: 'cyan', text: '线下', icon: <MapPin size={14} /> }
+  };
+
+  const filteredActivities = activities.filter(activity => {
+    const matchesSearch = activity.name?.toLowerCase().includes(searchText.toLowerCase());
+    const matchesType = activityTypeFilter === 'all' || activity.activity_type === activityTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const columns = [
     {
@@ -118,12 +134,50 @@ const ActivitiesPage = () => {
       ),
     },
     {
+      title: '活动类型',
+      dataIndex: 'activity_type',
+      key: 'activity_type',
+      width: 100,
+      render: (type) => {
+        const config = activityTypeConfig[type] || activityTypeConfig.offline;
+        return (
+          <Tag color={config.color} icon={config.icon}>
+            {config.text}
+          </Tag>
+        );
+      },
+    },
+    {
       title: '分类',
       dataIndex: 'category',
       key: 'category',
       width: 100,
       render: (category) => (
         <Tag color="blue">{category || '其他'}</Tag>
+      ),
+    },
+    {
+      title: '开始时间',
+      dataIndex: 'start_time',
+      key: 'start_time',
+      width: 150,
+      render: (time) => (
+        <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+          <Clock size={12} style={{ marginRight: 4 }} />
+          {time || '-'}
+        </span>
+      ),
+    },
+    {
+      title: '结束时间',
+      dataIndex: 'end_time',
+      key: 'end_time',
+      width: 150,
+      render: (time) => (
+        <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+          <Clock size={12} style={{ marginRight: 4 }} />
+          {time || '-'}
+        </span>
       ),
     },
     {
@@ -147,16 +201,32 @@ const ActivitiesPage = () => {
       },
     },
     {
-      title: '地点',
+      title: '地点/链接',
       dataIndex: 'location',
       key: 'location',
       width: 200,
-      render: (location) => (
-        <span style={{ color: '#8c8c8c', fontSize: 13 }}>
-          <MapPin size={12} style={{ marginRight: 4 }} />
-          {location || '-'}
-        </span>
-      ),
+      render: (location, record) => {
+        const isOnline = record.activity_type === 'online';
+        if (isOnline && record.online_link) {
+          return (
+            <a 
+              href={record.online_link} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: '#1890ff', fontSize: 13 }}
+            >
+              <Link size={12} style={{ marginRight: 4 }} />
+              点击加入
+            </a>
+          );
+        }
+        return (
+          <span style={{ color: '#8c8c8c', fontSize: 13 }}>
+            <MapPin size={12} style={{ marginRight: 4 }} />
+            {location || '-'}
+          </span>
+        );
+      },
     },
     {
       title: '负责人',
@@ -167,28 +237,42 @@ const ActivitiesPage = () => {
     {
       title: '操作',
       key: 'action',
-      width: 320,
+      width: 380,
       render: (_, record) => (
         <Space size="small">
-          <Button 
-            size="small"
-            icon={<QrCode size={14} />}
-            onClick={() => handleShowQrCode(record)}
-          >
-            签到码
-          </Button>
-          <Button 
-            type="text" 
-            size="small"
-            icon={<Eye size={14} />}
-            onClick={() => handleView(record)}
-          />
-          <Button 
-            type="text" 
-            size="small"
-            icon={<Edit2 size={14} />}
-            onClick={() => handleEdit(record)}
-          />
+          <Tooltip title="生成签到码">
+            <Button 
+              size="small"
+              icon={<QrCode size={14} />}
+              onClick={() => handleShowQrCode(record)}
+            >
+              签到码
+            </Button>
+          </Tooltip>
+          <Tooltip title="查看详情">
+            <Button 
+              type="text" 
+              size="small"
+              icon={<Eye size={14} />}
+              onClick={() => handleView(record)}
+            />
+          </Tooltip>
+          <Tooltip title="编辑活动">
+            <Button 
+              type="text" 
+              size="small"
+              icon={<Edit2 size={14} />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="复制活动">
+            <Button 
+              type="text" 
+              size="small"
+              icon={<PlusCircle size={14} />}
+              onClick={() => handleCopy(record)}
+            />
+          </Tooltip>
           <Button 
             type="primary" 
             size="small"
@@ -197,13 +281,15 @@ const ActivitiesPage = () => {
           >
             管理
           </Button>
-          <Button 
-            type="text" 
-            size="small"
-            danger
-            icon={<Trash2 size={14} />}
-            onClick={() => handleDelete(record.id)}
-          />
+          <Tooltip title="删除活动">
+            <Button 
+              type="text" 
+              size="small"
+              danger
+              icon={<Trash2 size={14} />}
+              onClick={() => handleDelete(record.id)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -215,7 +301,8 @@ const ActivitiesPage = () => {
     form.setFieldsValue({
       priority: 'medium',
       status: 'in_progress',
-      category: '会议'
+      category: '会议',
+      activity_type: 'offline'
     });
     setIsModalVisible(true);
   };
@@ -225,28 +312,197 @@ const ActivitiesPage = () => {
     form.setFieldsValue({
       name: record.name,
       category: record.category,
+      activity_type: record.activity_type,
       priority: record.priority,
       status: record.status,
       location: record.location,
+      online_link: record.online_link,
       responsible: record.responsible,
+      start_time: record.start_time,
+      end_time: record.end_time,
+      key_milestones: record.key_milestones,
       description: record.description
     });
     setIsModalVisible(true);
   };
 
+  const handleCopy = (record) => {
+    const copiedActivity = {
+      ...record,
+      name: `${record.name} (副本)`,
+      status: 'in_progress',
+      registered: 0,
+      checked_in: 0
+    };
+    form.setFieldsValue({
+      name: copiedActivity.name,
+      category: copiedActivity.category,
+      activity_type: copiedActivity.activity_type,
+      priority: copiedActivity.priority,
+      status: copiedActivity.status,
+      location: copiedActivity.location,
+      online_link: copiedActivity.online_link,
+      responsible: copiedActivity.responsible,
+      start_time: copiedActivity.start_time,
+      end_time: copiedActivity.end_time,
+      key_milestones: copiedActivity.key_milestones,
+      description: copiedActivity.description
+    });
+    setEditingActivity(null);
+    setIsModalVisible(true);
+    message.info('已复制活动信息，请修改后保存');
+  };
+
   const handleView = (record) => {
+    const typeConfig = activityTypeConfig[record.activity_type] || activityTypeConfig.offline;
+    const priorityConfigItem = priorityConfig[record.priority] || priorityConfig.medium;
+    const statusConfigItem = statusConfig[record.status] || statusConfig.in_progress;
+    
     Modal.info({
       title: '活动详情',
-      width: 500,
+      width: 700,
       content: (
         <div style={{ marginTop: 16 }}>
-          <p><strong>活动名称：</strong>{record.name}</p>
-          <p><strong>分类：</strong>{record.category}</p>
-          <p><strong>优先级：</strong>{priorityConfig[record.priority]?.text || '中'}</p>
-          <p><strong>状态：</strong>{statusConfig[record.status]?.text || '进行中'}</p>
-          <p><strong>地点：</strong>{record.location || '-'}</p>
-          <p><strong>负责人：</strong>{record.responsible || '-'}</p>
-          <p><strong>描述：</strong>{record.description || '暂无描述'}</p>
+          <div style={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: 12,
+            padding: 24,
+            marginBottom: 20,
+            color: '#fff'
+          }}>
+            <h2 style={{ margin: 0, fontSize: 24, marginBottom: 8 }}>{record.name}</h2>
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <Tag color="white" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none' }}>
+                {record.category}
+              </Tag>
+              <Tag color="white" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none' }}>
+                {typeConfig.text}
+              </Tag>
+            </div>
+          </div>
+
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Calendar size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>活动状态</span>
+                </div>
+                <Tag color={statusConfigItem.color} style={{ fontSize: 14, padding: '4px 12px' }}>
+                  {statusConfigItem.text}
+                </Tag>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <MapPin size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>优先级</span>
+                </div>
+                <Tag color={priorityConfigItem.color} style={{ fontSize: 14, padding: '4px 12px' }}>
+                  {priorityConfigItem.text}
+                </Tag>
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Clock size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>开始时间</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {record.start_time || '-'}
+                </div>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Clock size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>结束时间</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {record.end_time || '-'}
+                </div>
+              </Card>
+            </Col>
+          </Row>
+
+          <Card size="small" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              {record.activity_type === 'online' ? (
+                <Link size={16} style={{ color: '#1890ff' }} />
+              ) : (
+                <MapPin size={16} style={{ color: '#1890ff' }} />
+              )}
+              <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+                {record.activity_type === 'online' ? '活动链接' : '活动地址'}
+              </span>
+            </div>
+            {record.activity_type === 'online' ? (
+              record.online_link ? (
+                <a href={record.online_link} target="_blank" rel="noopener noreferrer" style={{ color: '#1890ff', wordBreak: 'break-all' }}>
+                  {record.online_link}
+                </a>
+              ) : (
+                <span style={{ color: '#8c8c8c' }}>-</span>
+              )
+            ) : (
+              <span style={{ fontSize: 14 }}>{record.location || '-'}</span>
+            )}
+          </Card>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <MessageSquare size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>负责人</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {record.responsible || '-'}
+                </div>
+              </Card>
+            </Col>
+            <Col span={12}>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <QrCode size={16} style={{ color: '#1890ff' }} />
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>报名/签到</span>
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {record.registered || 0} / {record.checked_in || 0}
+                </div>
+              </Card>
+            </Col>
+          </Row>
+
+          {record.key_milestones && (
+            <Card size="small" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Clock size={16} style={{ color: '#1890ff' }} />
+                <span style={{ color: '#8c8c8c', fontSize: 12 }}>关键节点</span>
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+                {record.key_milestones}
+              </div>
+            </Card>
+          )}
+
+          {record.description && (
+            <Card size="small" style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <MessageSquare size={16} style={{ color: '#1890ff' }} />
+                <span style={{ color: '#8c8c8c', fontSize: 12 }}>活动描述</span>
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.8, color: '#595959' }}>
+                {record.description}
+              </div>
+            </Card>
+          )}
         </div>
       ),
     });
@@ -276,6 +532,43 @@ const ActivitiesPage = () => {
   const handleShowQrCode = (record) => {
     setSelectedActivity(record);
     setIsQrCodeVisible(true);
+  };
+
+  const handleExport = () => {
+    const exportData = filteredActivities.map(activity => ({
+      '活动名称': activity.name,
+      '活动类型': activity.activity_type === 'online' ? '线上' : '线下',
+      '分类': activity.category,
+      '优先级': priorityConfig[activity.priority]?.text || '中',
+      '状态': statusConfig[activity.status]?.text || '进行中',
+      '开始时间': activity.start_time || '-',
+      '结束时间': activity.end_time || '-',
+      '地址/链接': activity.activity_type === 'online' ? activity.online_link : activity.location,
+      '负责人': activity.responsible || '-',
+      '关键节点': activity.key_milestones || '-',
+      '描述': activity.description || '-',
+      '报名人数': activity.registered || 0,
+      '签到人数': activity.checked_in || 0
+    }));
+
+    const headers = Object.keys(exportData[0] || {}).join(',');
+    const rows = exportData.map(row => 
+      Object.values(row).map(value => 
+        typeof value === 'string' ? `"${value.replace(/"/g, '""')}"` : value
+      ).join(',')
+    );
+
+    const csvContent = [headers, ...rows].join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `活动列表_${new Date().toLocaleDateString('zh-CN')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    message.success('导出成功');
   };
 
   const handleModalOk = async () => {
@@ -332,17 +625,25 @@ const ActivitiesPage = () => {
         marginBottom: 24 
       }}>
         <h1 style={{ margin: 0 }}>活动管理</h1>
-        <Button 
-          type="primary" 
-          icon={<Plus size={16} />}
-          onClick={handleAdd}
-        >
-          新增活动
-        </Button>
+        <Space>
+          <Button 
+            icon={<Download size={16} />}
+            onClick={handleExport}
+          >
+            导出
+          </Button>
+          <Button 
+            type="primary" 
+            icon={<Plus size={16} />}
+            onClick={handleAdd}
+          >
+            新增活动
+          </Button>
+        </Space>
       </div>
 
       <Card>
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <SearchInput
             placeholder="搜索活动名称"
             allowClear
@@ -350,7 +651,18 @@ const ActivitiesPage = () => {
             size="large"
             onSearch={setSearchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ maxWidth: 400 }}
+            style={{ maxWidth: 400, flex: 1, minWidth: 200 }}
+          />
+          <Select
+            placeholder="筛选活动类型"
+            size="large"
+            style={{ width: 150, minWidth: 120 }}
+            value={activityTypeFilter}
+            onChange={setActivityTypeFilter}
+            options={[
+              { label: '全部', value: 'all' },
+              ...activityTypeOptions
+            ]}
           />
         </div>
 
@@ -359,6 +671,7 @@ const ActivitiesPage = () => {
           dataSource={filteredActivities}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 'max-content' }}
           locale={{
             emptyText: (
               <Empty
@@ -371,8 +684,10 @@ const ActivitiesPage = () => {
             total: filteredActivities.length,
             pageSize: 10,
             showTotal: (total) => `共 ${total} 条`,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100']
           }}
-          scroll={{ x: 1200 }}
         />
       </Card>
 
@@ -385,7 +700,7 @@ const ActivitiesPage = () => {
           setIsModalVisible(false);
           form.resetFields();
         }}
-        width={600}
+        width={800}
         okText={editingActivity ? '保存' : '创建'}
         cancelText="取消"
       >
@@ -402,8 +717,8 @@ const ActivitiesPage = () => {
             <Input placeholder="请输入活动名称" />
           </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={8}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="category"
                 label="分类"
@@ -412,7 +727,25 @@ const ActivitiesPage = () => {
                 <Select options={categoryOptions} placeholder="选择分类" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                name="activity_type"
+                label="活动类型"
+                rules={[{ required: true, message: '请选择活动类型' }]}
+              >
+                <Select 
+                  options={activityTypeOptions} 
+                  placeholder="选择活动类型"
+                  onChange={(value) => {
+                    form.setFieldsValue({
+                      location: value === 'online' ? undefined : form.getFieldValue('location'),
+                      online_link: value === 'offline' ? undefined : form.getFieldValue('online_link')
+                    });
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="priority"
                 label="优先级"
@@ -421,7 +754,10 @@ const ActivitiesPage = () => {
                 <Select options={priorityOptions} placeholder="选择优先级" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+          </Row>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 name="status"
                 label="状态"
@@ -430,23 +766,99 @@ const ActivitiesPage = () => {
                 <Select options={statusOptions} placeholder="选择状态" />
               </Form.Item>
             </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
-                name="location"
-                label="地点"
+                name="start_time"
+                label="开始时间"
               >
-                <Input placeholder="请输入活动地点" />
+                <DatePicker 
+                  showTime 
+                  style={{ width: '100%' }}
+                  placeholder="选择开始时间"
+                />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                name="end_time"
+                label="结束时间"
+                dependencies={['start_time']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      const startTime = getFieldValue('start_time');
+                      if (startTime && value && value.isBefore(startTime)) {
+                        return Promise.reject(new Error('结束时间不能早于开始时间'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker 
+                  showTime 
+                  style={{ width: '100%' }}
+                  placeholder="选择结束时间"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.activity_type !== currentValues.activity_type}>
+            {({ getFieldValue }) => {
+              const activityType = getFieldValue('activity_type');
+              return (
+                <>
+                  {activityType === 'online' && (
+                    <Form.Item
+                      name="online_link"
+                      label="活动链接"
+                      rules={[
+                        { required: true, message: '线上活动请填写活动链接' },
+                        { type: 'url', message: '请输入有效的URL地址' }
+                      ]}
+                    >
+                      <Input 
+                        placeholder="请输入活动链接（如：https://meeting.example.com）" 
+                        prefix={<Link size={16} />}
+                      />
+                    </Form.Item>
+                  )}
+                  {activityType === 'offline' && (
+                    <Form.Item
+                      name="location"
+                      label="活动地址"
+                      rules={[{ required: true, message: '线下活动请填写活动地址' }]}
+                    >
+                      <Input 
+                        placeholder="请输入活动地址（如：北京市朝阳区XX大厦3楼会议室）" 
+                        prefix={<MapPin size={16} />}
+                      />
+                    </Form.Item>
+                  )}
+                </>
+              );
+            }}
+          </Form.Item>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="responsible"
                 label="负责人"
               >
                 <Input placeholder="请输入负责人" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="key_milestones"
+                label="关键节点时间"
+              >
+                <Input 
+                  placeholder="请输入关键节点时间（如：09:00 签到，09:30 开场）"
+                  prefix={<Clock size={16} />}
+                />
               </Form.Item>
             </Col>
           </Row>

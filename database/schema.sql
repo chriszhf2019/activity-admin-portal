@@ -21,12 +21,15 @@ CREATE TABLE activities (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   category VARCHAR(20),
+  activity_type VARCHAR(10) DEFAULT 'offline',
   priority VARCHAR(10) DEFAULT 'medium',
   status VARCHAR(20) DEFAULT 'in_progress',
   create_time TIMESTAMP DEFAULT NOW(),
+  start_time TIMESTAMP,
   end_time TIMESTAMP,
   location VARCHAR(200),
-  meeting_type VARCHAR(20) DEFAULT 'offline',
+  online_link VARCHAR(500),
+  key_milestones VARCHAR(500),
   responsible VARCHAR(50),
   description TEXT,
   registered INTEGER DEFAULT 0,
@@ -127,10 +130,10 @@ INSERT INTO users (real_name, nickname, phone, company, position, points, meetin
 ('赵敏', '敏敏', '13654321987', '广州网络科技', '市场总监', 1560, 6, '赵', 'active', true, '银牌渠道商'),
 ('孙浩', '浩子', '15812345678', '杭州数据服务', '技术总监', 980, 4, '孙', 'active', false, '普通渠道商');
 
-INSERT INTO activities (name, category, priority, status, location, meeting_type, responsible, description, registered, checked_in) VALUES
-('2024年度渠道商大会', '会议', 'high', 'in_progress', '北京市朝阳区建国路88号', 'offline', '张经理', '年度渠道商大会', 156, 128),
-('新产品发布会', '会议', 'high', 'completed', '上海市浦东新区陆家嘴金融中心', 'offline', '李总监', '发布2024年度新产品线', 200, 185),
-('技术培训研讨会', '培训', 'medium', 'in_progress', '线上会议', 'online', '王工程师', '针对渠道商技术人员的产品技术培训', 98, 89);
+INSERT INTO activities (name, category, activity_type, priority, status, start_time, end_time, location, online_link, key_milestones, responsible, description, registered, checked_in) VALUES
+('2024年度渠道商大会', '会议', 'offline', 'high', 'in_progress', '2024-03-15 09:00:00', '2024-03-15 18:00:00', '北京市朝阳区建国路88号', NULL, '09:00 签到，09:30 开场，12:00 午餐，14:00 主题演讲', '张经理', '年度渠道商大会', 156, 128),
+('新产品发布会', '会议', 'offline', 'high', 'completed', '2024-03-10 14:00:00', '2024-03-10 17:00:00', '上海市浦东新区陆家嘴金融中心', NULL, '14:00 签到，14:30 发布会开始，16:00 产品演示', '李总监', '发布2024年度新产品线', 200, 185),
+('技术培训研讨会', '培训', 'online', 'medium', 'in_progress', '2024-03-20 10:00:00', '2024-03-20 16:00:00', NULL, 'https://meeting.example.com/join/123456', '10:00 签到，10:30 培训开始，12:00 午休，14:00 实战演练', '王工程师', '针对渠道商技术人员的产品技术培训', 98, 89);
 
 INSERT INTO gifts (name, points, stock, redeemed, image, description) VALUES
 ('品牌雨伞', 500, 50, 12, '🌂', '高品质防风雨伞'),
