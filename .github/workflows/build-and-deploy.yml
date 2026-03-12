@@ -1,9 +1,14 @@
-name: Build and Deploy
+name: Build and Deploy to Tencent Cloud
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      deploy_message:
+        description: '部署说明'
+        required: false
+        default: '手动触发部署'
 
 permissions:
   contents: read
@@ -43,11 +48,72 @@ jobs:
 
   deploy:
     environment:
-      name: github-pages
+      name: tencent-cloud
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Tencent Cloud
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          source: "dist/"
+          target: "/var/www/xiaohuodong0310"
+          overwrite: true
+          rm: true
+
+      - name: Configure Nginx
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # 创建Nginx配置
+            cat > /etc/nginx/sites-available/xiaohuodong0310 << 'EOF'
+            server {
+                listen 80;
+                server_name _;
+                root /var/www/xiaohuodong0310;
+                index index.html;
+
+                location / {
+                    try_files $uri $uri/ /index.html;
+                }
+
+                location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                    access_log off;
+                }
+
+                add_header X-Frame-Options "SAMEORIGIN" always;
+                add_header X-Content-Type-Options "nosniff" always;
+                add_header X-XSS-Protection "1; mode=block" always;
+            }
+            EOF
+
+            # 创建软链接
+            ln -sf /etc/nginx/sites-available/xiaohuodong0310 /etc/nginx/sites-enabled/
+
+            # 测试并重载
+            nginx -t && systemctl reload nginx
+          script_stop: "Nginx configured and reloaded"
+
+      - name: Verify deployment
+        run: |
+          echo "========================================="
+          echo "  部署完成！"
+          echo "========================================="
+          echo ""
+          echo "访问地址: http://${{ secrets.SERVER_IP }}"
+          echo ""
+          echo "部署时间: $(date)"
+          echo "========================================="
