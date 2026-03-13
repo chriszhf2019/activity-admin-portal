@@ -25,3 +25,7 @@ docker-compose.yml
 nginx.conf
 nginx-site.conf
 DEPLOYMENT.md
+SIMPLE_DEPLOY.md
+TROUBLESHOOTING.md
+MANUAL_DEPLOY.md
+DATABASE_SETUP.md
