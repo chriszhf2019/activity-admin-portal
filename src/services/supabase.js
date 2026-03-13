@@ -83,6 +83,17 @@ export const userService = {
     return data;
   },
 
+  async create(user) {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('users')
+      .insert(user)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async updatePoints(id, points) {
     if (!supabase) return null;
     const { data, error } = await supabase
